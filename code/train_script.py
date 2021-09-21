@@ -116,7 +116,7 @@ def main(args):
     if 'iqr' in args.loss:
         iqr_prop = get_iqr_proportions(train_dataset)
     if args.standardize:
-        scaler = standardize(train_dataset, valid_dataset, test_dataset)
+        scaler = standardize(train_dataset, valid_dataset, test_dataset, device=device)
 
     loss_ftn_obj = LossFunction(args.loss, emd_model_name=args.emd_model_name, device=device, iqr_prop=iqr_prop)
 
