@@ -252,5 +252,4 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
         for j1, j2 in zip(jet_reco, jet_in):
             emd_val = ef.emd.emd(j1, j2)
             true_emd.append(emd_val)
-    import pdb; pdb.set_trace()
     make_plots(true_emd, pred_emd)
