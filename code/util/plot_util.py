@@ -4,7 +4,9 @@ import mplhep as hep
 import os.path as osp
 import energyflow as ef
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 from pathlib import Path
+from torch_geometric.utils import to_dense_batch
 
 plt.style.use(hep.style.CMS)
 
@@ -200,17 +202,55 @@ def reco_relative_diff(jet_in, jet_out, save_dir, save_name):
     plt.savefig(osp.join(save_dir, save_name + '_' + feat))
     plt.close()
 
-def plot_emd_corr(true_emd, pred_emd, save_dir, save_name):
+@torch.no_grad()
+def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, device):
     """
-    :param true_emd: np array
-    :param pred_emd: np array
+    :param model: GAE
+    :param loader: torch dataloader
+    :param emd_loss_ftn: function for predicting emd using nn
+    :param save_dir: where to save plots
+    :param save_name: name to save plot as
+    :param scaler: prefitted Standardizer
+    :param device: torch device cpu/gpu
     """
-    max_range = max(np.max(true_emd), np.max(pred_emd))
-    fig, ax = plt.subplots(figsize =(5, 5))
-    plt.hist2d(true_emd, pred_emd)
-    x_bins = np.linspace(0, max_range, 101)
-    y_bins = np.linspace(0, max_range, 101)
-    ax.set_xlabel('True EMD')  
-    ax.set_ylabel('Pred. EMD')
-    plt.savefig(osp.join(save_dir, save_name))
-    plt.close()
+    def make_plots(true_emd, pred_emd):
+        """
+        :param true_emd: np array
+        :param pred_emd: np array
+        """
+        max_range = max(np.max(true_emd), np.max(pred_emd))
+        fig, ax = plt.subplots(figsize =(5, 5))
+        plt.hist2d(true_emd, pred_emd)
+        x_bins = np.linspace(0, max_range, 101)
+        y_bins = np.linspace(0, max_range, 101)
+        ax.set_xlabel('True EMD')  
+        ax.set_ylabel('Pred. EMD')
+        plt.savefig(osp.join(save_dir, save_name))
+        plt.close()
+
+    pred_emd = []
+    true_emd = []
+    model.eval()
+    for b in tqdm(loader, desc='Calculating True/Pred. EMDs'):
+        b = b.clone()
+        b.to(device)
+
+        # get gae reconstruction
+        b.x[:,:] = scaler.transform(b.x)
+        jet_reco = model(b)
+
+        # inverse scales to feed into emd network
+        jet_reco = scaler.inverse_transform(jet_reco)
+        jet_in = scaler.inverse_transform(b.x)
+        pred = emd_loss_ftn(jet_in, jet_reco, b.batch, mean=False).reshape(-1).tolist()
+        pred_emd += pred
+
+        # calc true emd
+        jet_reco[jet_reco < 0] = 0  # no negative pt to calc true emd
+        jet_reco = to_dense_batch(x=jet_reco, batch=b.batch)[0].detach().cpu().numpy()
+        jet_in = to_dense_batch(x=jet_in, batch=b.batch)[0].detach().cpu().numpy()
+        for j1, j2 in zip(jet_reco, jet_in):
+            emd_val = ef.emd.emd(j1, j2)
+            true_emd.append(emd_val)
+    import pdb; pdb.set_trace()
+    make_plots(true_emd, pred_emd)
