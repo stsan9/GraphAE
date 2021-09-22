@@ -115,11 +115,12 @@ def test_plot_emd_corr():
     dataset = [data for data in chain.from_iterable(gdata)]
 
     random.Random(0).shuffle(dataset)
-    small_sample = dataset[:int(0.10 * len(dataset))]
-    loader = DataLoader(small_sample, batch_size=32)
+    batch_size = 256
+    train_data = dataset[:int(0.8 * len(dataset))]
+    test_loader = DataLoader(dataset[int(0.8 * len(dataset)):], batch_size=256)
 
-    data_x = torch.cat([d.x for d in small_sample])
-    scaler = Standardizer(device=device)
+    data_x = torch.cat([d.x for d in train_data])
+    scaler = Standardizer()
     scaler.fit(data_x)
 
     model = get_model('EdgeNet', input_dim=3, hidden_dim=2, big_dim=32, emd_modname=None)
@@ -128,7 +129,7 @@ def test_plot_emd_corr():
     model.eval()
 
     lf = LossFunction('emd_loss')
-    plot_emd_corr(model, loader, lf.loss_ftn, args.plot_dir, 'emd_corr', scaler, device)
+    plot_emd_corr(model, test_loader, lf.loss_ftn, args.plot_dir, 'emd_corr', scaler, device)
 
 
 if __name__ == '__main__':

@@ -15,7 +15,7 @@ def get_iqr_proportions(dataset):
     return iqr_prop
 
 
-def standardize(train_dataset, valid_dataset, test_dataset, log_pt=False, device=torch.device('cuda:0')):
+def standardize(train_dataset, valid_dataset, test_dataset, log_pt=False):
     """
     standardize dataset and return scaler for inversion
 

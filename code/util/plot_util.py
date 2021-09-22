@@ -245,7 +245,6 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
         b.to(device)
 
         # get gae reconstruction
-        b.x[:,:] = scaler.transform(b.x)
         jet_reco = model(b)
 
         # inverse scales to feed into emd network
