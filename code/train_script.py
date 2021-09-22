@@ -18,7 +18,7 @@ from util.loss_util import LossFunction
 from datagen.graph_data_gae import GraphDataset
 from util.train_util import get_model, forward_loss
 from util.preprocessing import get_iqr_proportions, standardize
-from util.plot_util import loss_curves, gen_emd_corr, plot_reco_for_loader
+from util.plot_util import loss_curves, epoch_emd_corr, plot_reco_for_loader, plot_emd_corr
 
 torch.manual_seed(0)
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -159,7 +159,7 @@ def main(args):
         loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj)
         # if epoch % 5 == 0 and args.loss == 'emd_loss':
         #     valid_loss, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, True)
-        #     gen_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch)
+        #     epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch)
         # else:
         valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj)
 
@@ -203,6 +203,13 @@ def main(args):
     plot_reco_for_loader(model, train_loader, device, scaler, inverse_standardization, model_fname, osp.join(save_dir, 'reconstruction_post_train', 'train'), args.plot_scale)
     plot_reco_for_loader(model, valid_loader, device, scaler, inverse_standardization, model_fname, osp.join(save_dir, 'reconstruction_post_train', 'valid'), args.plot_scale)
     plot_reco_for_loader(model, test_loader, device, scaler, inverse_standardization, model_fname, osp.join(save_dir, 'reconstruction_post_train', 'test'), args.plot_scale)
+    
+    # plot emd correlation plots between emd-nn and true emd values between gae input and output
+    if args.plot_emd_corr:
+        loss_ftn_obj = LossFunction('emd_loss', emd_model_name=args.emd_model_name, device=device)
+        emd_loss_ftn = loss_ftn_obj.loss_ftn
+        import pdb; pdb.set_trace()
+        plot_emd_corr(model, test_loader, emd_loss_ftn, save_dir, 'emd_corr', scaler, device)
     print('Completed')
 
 if __name__ == '__main__':
@@ -229,6 +236,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-workers', type=int, help='num_workers param for dataloader', 
                         default=0, required=False)
     parser.add_argument("--standardize", action="store_true", help="normalize dataset", required=False)
+    parser.add_argument("--plot-emd-corr", action="store_true", help="plot emd correlation plot at end of training", required=False)
     parser.add_argument("--plot-scale", choices=['cartesian','hadronic','standardized'],
                         help='classes for x-axis scaling for plotting reconstructions', default='cartesian', required=False)
     args = parser.parse_args()

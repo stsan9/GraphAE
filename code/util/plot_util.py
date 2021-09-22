@@ -118,7 +118,16 @@ def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path):
     plt.savefig(osp.join(save_path, 'loss_curves.png'))
     plt.close()
 
-def gen_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch):
+def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch):
+    """
+    Plot emd correlation plot at this epoch
+
+    :param in_parts: (batch, n, feat) torch tensor input jets
+    :param gen_parts: (batch, n, feat) torch tensor for model reco
+    :param pred_emd: list of predicted emds from emd-nn
+    :param save_dir: directory to save plot
+    :param epoch: epoch correlation plot is made for
+    """
 
     save_dir = osp.join(save_dir, 'emd_corr_plots')
     Path(save_dir).mkdir(exist_ok=True)
