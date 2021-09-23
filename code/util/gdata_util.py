@@ -38,7 +38,8 @@ def jet_particles(df, R=1.0, u=False, features='xyz'):
                     particles[p,:] = np.array([part.pt,
                                                part.eta,
                                                part.phi])
-                    particles = normalize(particles)    # relative pt eta phi
+            if features != 'xyz':
+                particles = normalize(particles)    # relative pt eta phi
 
             if u:
                 signal_bit = all_events[i][-1]

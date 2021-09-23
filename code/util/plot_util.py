@@ -97,26 +97,45 @@ def plot_reco_for_loader(model, loader, device, scaler, inverse_scale, model_fna
     plot_reco_difference(input_fts, reco_fts, model_fname, save_dir, feature_format)
 
 
-def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path):
+def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, true_emd=None):
     '''
         Graph our training and validation losses.
     '''
-    plt.plot(epochs, train_loss, valid_loss)
-    plt.xticks(epochs)
-    ax = plt.gca()
-    ax.set_yscale('log')
-    if max(epochs) < 60:
-        ax.locator_params(nbins=10, axis='x')
+    if true_emd == None:
+        plt.plot(epochs, train_loss, valid_loss)
+        plt.xticks(epochs)
+        ax = plt.gca()
+        ax.set_yscale('log')
+        if max(epochs) < 60:
+            ax.locator_params(nbins=10, axis='x')
+        else:
+            ax.set_xticks(np.arange(0, max(epochs), 20))
+        if early_stop_epoch != None:
+            plt.axvline(x=early_stop_epoch, linestyle='--')
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
+        plt.legend(['Train', 'Validation', 'Best model'])
+        plt.savefig(osp.join(save_path, 'loss_curves.pdf'))
+        plt.savefig(osp.join(save_path, 'loss_curves.png'))
+        plt.close()
     else:
-        ax.set_xticks(np.arange(0, max(epochs), 20))
-    if early_stop_epoch != None:
-        plt.axvline(x=early_stop_epoch, linestyle='--')
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.legend(['Train', 'Validation', 'Best model'])
-    plt.savefig(osp.join(save_path, 'loss_curves.pdf'))
-    plt.savefig(osp.join(save_path, 'loss_curves.png'))
-    plt.close()
+        plt.plot(epochs, train_loss, valid_loss, true_emd)
+        plt.xticks(epochs)
+        ax = plt.gca()
+        ax.set_yscale('log')
+        if max(epochs) < 60:
+            ax.locator_params(nbins=10, axis='x')
+        else:
+            ax.set_xticks(np.arange(0, max(epochs), 20))
+        if early_stop_epoch != None:
+            plt.axvline(x=early_stop_epoch, linestyle='--')
+        plt.xlabel("Epochs")
+        plt.ylabel("EMD-NN Loss")
+        plt.legend(['Train', 'Validation', 'True EMD', 'Best model'])
+        plt.savefig(osp.join(save_path, 'loss_curves.pdf'))
+        plt.savefig(osp.join(save_path, 'loss_curves.png'))
+        plt.close()
+
 
 def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch):
     """
@@ -228,7 +247,6 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
         :param pred_emd: np array
         """
         # plot figures
-        plt.rcParams['figure.figsize'] = (4,4)
         plt.rcParams['figure.dpi'] = 120
         plt.rcParams['font.family'] = 'serif'
         max_range = max(np.max(true_emd), np.max(pred_emd))
