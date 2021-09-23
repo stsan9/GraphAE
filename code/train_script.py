@@ -208,7 +208,6 @@ def main(args):
     if args.plot_emd_corr:
         loss_ftn_obj = LossFunction('emd_loss', emd_model_name=args.emd_model_name, device=device)
         emd_loss_ftn = loss_ftn_obj.loss_ftn
-        import pdb; pdb.set_trace()
         plot_emd_corr(model, test_loader, emd_loss_ftn, save_dir, 'emd_corr', scaler, device)
     print('Completed')
 

@@ -53,7 +53,7 @@ def plot_reco_difference(input_fts, reco_fts, model_fname, save_path, feature='h
         elif feature == 'hadronic':
             bins = np.linspace(-2, 2, 101)
             if i == 0:  # different bin size for pt rel
-                bins = np.linspace(-0.05, 0.1, 101)
+                bins = np.linspace(-0.005, 0.01, 101)
         else:
             bins = np.linspace(-1, 1, 101)
         plt.ticklabel_format(useMathText=True)
@@ -227,11 +227,16 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
         :param true_emd: np array
         :param pred_emd: np array
         """
+        # plot figures
+        plt.rcParams['figure.figsize'] = (4,4)
+        plt.rcParams['figure.dpi'] = 120
+        plt.rcParams['font.family'] = 'serif'
         max_range = max(np.max(true_emd), np.max(pred_emd))
         fig, ax = plt.subplots(figsize =(5, 5))
-        plt.hist2d(true_emd, pred_emd)
-        x_bins = np.linspace(0, max_range, 101)
-        y_bins = np.linspace(0, max_range, 101)
+        x_bins = np.linspace(0, max_range, 31)
+        y_bins = np.linspace(0, max_range, 31)
+        print(len(true_emd))
+        plt.hist2d(true_emd, pred_emd, bins=[x_bins, y_bins])
         ax.set_xlabel('True EMD')  
         ax.set_ylabel('Pred. EMD')
         plt.savefig(osp.join(save_dir, save_name))
