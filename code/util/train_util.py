@@ -1,5 +1,7 @@
 import torch
+import energyflow as ef
 from torch_geometric.data import Batch
+from torch_geometric.utils import to_dense_batch
 
 import models.models as models
 
@@ -35,7 +37,19 @@ def forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler=None):
             y = scaler.inverse_transform(y)
         batch_loss = loss_ftn_obj.loss_ftn(batch_output, y, batch)
 
-    if loss_ftn_obj.name == 'chamfer_loss':
+        # calc true emd
+        batch_output[batch_output < 0] = 0  # no negative pt to calc true emd
+        batch_output = to_dense_batch(x=batch_output, batch=batch)[0].detach().cpu().numpy()
+        y = to_dense_batch(x=y, batch=batch)[0].detach().cpu().numpy()
+        true_emd = 0
+        for j1, j2 in zip(batch_output, y):
+            emd_val = ef.emd.emd(j1, j2)
+            true_emd += emd_val
+        true_emd /= len(y)
+
+        batch_loss = (batch_loss, true_emd)
+
+    elif loss_ftn_obj.name == 'chamfer_loss':
         batch_output = model(data)
         if multi_gpu:
             data = Batch.from_data_list(data).to(device)

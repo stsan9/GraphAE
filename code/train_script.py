@@ -38,6 +38,8 @@ def test(model, loader, total, batch_size, loss_ftn_obj, gen_emd_corr=False, sca
     for i,data in t:
 
         batch_loss, batch_output = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
+        if 'emd_loss' in loss_ftn_obj.name:
+            batch_loss, true_emd = batch_loss
 
         batch_loss = batch_loss.item()
         sum_loss += batch_loss
@@ -51,6 +53,8 @@ def test(model, loader, total, batch_size, loss_ftn_obj, gen_emd_corr=False, sca
 
     if gen_emd_corr:
         return sum_loss / (i+1), in_parts, gen_parts, pred_emd
+    if 'emd_loss' in loss_ftn_obj.name:
+        return sum_loss / (i+1), true_emd
     return sum_loss / (i+1)
 
 def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None):
@@ -62,6 +66,8 @@ def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None
         optimizer.zero_grad()
 
         batch_loss, batch_output = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
+        if 'emd_loss' in loss_ftn_obj.name:
+            batch_loss, true_emd = batch_loss
         batch_loss.backward()
         optimizer.step()
 
@@ -70,6 +76,8 @@ def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None
         t.set_description('train loss = %.7f' % batch_loss)
         t.refresh() # to show immediately the update
 
+    if 'emd_loss' in loss_ftn_obj.name:
+        return sum_loss / (i+1), true_emd
     return sum_loss / (i+1)
 
 def main(args):
@@ -133,12 +141,16 @@ def main(args):
     # load model
     valid_losses = []
     train_losses = []
+    train_true_emd = [] if 'emd_loss' in loss_ftn_obj.name else None
+    valid_true_emd = [] if 'emd_loss' in loss_ftn_obj.name else None
     start_epoch = 0
     modpath = osp.join(save_dir, model_fname+'.best.pth')
     if osp.isfile(modpath):
         model.load_state_dict(torch.load(modpath, map_location=device))
         model.to(device)
         best_valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
+        if 'emd_loss' in loss_ftn_obj.name:
+            best_valid_loss, ef_emd = best_valid_loss
         print('Loaded model')
         print(f'Saved model valid loss: {best_valid_loss}')
         if osp.isfile(osp.join(save_dir,'losses.pt')):
@@ -158,11 +170,17 @@ def main(args):
     for epoch in range(start_epoch, n_epochs):
 
         loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
+        if 'emd_loss' in loss_ftn_obj.name:
+            loss, ef_emd = loss
+            train_true_emd.append(ef_emd)
         # if epoch % 5 == 0 and args.loss == 'emd_loss':
         #     valid_loss, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, True, scaler=scaler)
         #     epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch)
         # else:
         valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
+        if 'emd_loss' in loss_ftn_obj.name:
+            valid_loss, ef_emd = valid_loss
+            valid_true_emd.append(ef_emd)
 
         scheduler.step(valid_loss)
         train_losses.append(loss)
@@ -189,7 +207,7 @@ def main(args):
     # model training done
     train_epochs = list(range(epoch+1))
     early_stop_epoch = epoch - stale_epochs
-    loss_curves(train_epochs, early_stop_epoch, train_losses, valid_losses, save_dir)
+    loss_curves(train_epochs, early_stop_epoch, train_losses, valid_losses, save_dir, train_true_emd, valid_true_emd)
 
     # load best model
     del model

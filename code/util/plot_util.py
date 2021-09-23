@@ -97,11 +97,11 @@ def plot_reco_for_loader(model, loader, device, scaler, inverse_scale, model_fna
     plot_reco_difference(input_fts, reco_fts, model_fname, save_dir, feature_format)
 
 
-def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, true_emd=None):
+def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, train_true_emd=None, valid_true_emd=None):
     '''
         Graph our training and validation losses.
     '''
-    if true_emd == None:
+    if train_true_emd == None or valid_true_emd == None:
         plt.plot(epochs, train_loss, valid_loss)
         plt.xticks(epochs)
         ax = plt.gca()
@@ -119,7 +119,10 @@ def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, tru
         plt.savefig(osp.join(save_path, 'loss_curves.png'))
         plt.close()
     else:
-        plt.plot(epochs, train_loss, valid_loss, true_emd)
+        plt.plot(epochs, train_loss)
+        plt.plot(epochs, valid_loss, label='Validation')
+        plt.plot(epochs, train_true_emd, label='True EMD (Train)')
+        plt.plot(epochs, valid_true_emd, label='True EMD (Valid.)')
         plt.xticks(epochs)
         ax = plt.gca()
         ax.set_yscale('log')
@@ -128,10 +131,10 @@ def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, tru
         else:
             ax.set_xticks(np.arange(0, max(epochs), 20))
         if early_stop_epoch != None:
-            plt.axvline(x=early_stop_epoch, linestyle='--')
+            plt.axvline(x=early_stop_epoch, linestyle='--', label='Best model')
         plt.xlabel("Epochs")
         plt.ylabel("EMD-NN Loss")
-        plt.legend(['Train', 'Validation', 'True EMD', 'Best model'])
+        plt.legend()
         plt.savefig(osp.join(save_path, 'loss_curves.pdf'))
         plt.savefig(osp.join(save_path, 'loss_curves.png'))
         plt.close()
@@ -247,10 +250,19 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
         :param pred_emd: np array
         """
         # plot figures
+        plt.rcParams['figure.figsize'] = (4,4)
         plt.rcParams['figure.dpi'] = 120
         plt.rcParams['font.family'] = 'serif'
+
         max_range = max(np.max(true_emd), np.max(pred_emd))
-        fig, ax = plt.subplots(figsize =(5, 5))
+        fig, ax = plt.subplots(figsize =(9, 9)) 
+        plt.hist(true_emd, bins=np.linspace(0, max_range , 31),label='True', alpha=0.5)
+        plt.hist(pred_emd, bins=np.linspace(0, max_range, 31),label = 'Pred.', alpha=0.5)
+        plt.legend()
+        ax.set_xlabel('EMD') 
+        fig.savefig(osp.join(save_dir, save_name + '2'))
+
+        fig, ax = plt.subplots(figsize =(9, 9))
         x_bins = np.linspace(0, max_range, 31)
         y_bins = np.linspace(0, max_range, 31)
         print(len(true_emd))
