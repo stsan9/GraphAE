@@ -148,13 +148,16 @@ def main(args):
     if osp.isfile(modpath):
         model.load_state_dict(torch.load(modpath, map_location=device))
         model.to(device)
-        best_valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
-        if 'emd_loss' in loss_ftn_obj.name:
-            best_valid_loss, ef_emd = best_valid_loss
-        print('Loaded model')
-        print(f'Saved model valid loss: {best_valid_loss}')
-        if osp.isfile(osp.join(save_dir,'losses.pt')):
-            train_losses, valid_losses, start_epoch = torch.load(osp.join(save_dir,'losses.pt'))
+        if not args.drop_old_losses:    # use when swapping from pretrained network to new training w/ different loss
+            best_valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
+            if 'emd_loss' in loss_ftn_obj.name:
+                best_valid_loss, ef_emd = best_valid_loss
+            print('Loaded model')
+            print(f'Saved model valid loss: {best_valid_loss}')
+            if osp.isfile(osp.join(save_dir,'losses.pt')):
+                train_losses, valid_losses, start_epoch = torch.load(osp.join(save_dir,'losses.pt'))
+        else:
+            best_valid_loss = 9999999
     else:
         print('Creating new model')
         best_valid_loss = 9999999
@@ -255,6 +258,7 @@ if __name__ == '__main__':
                         default=0, required=False)
     parser.add_argument("--standardize", action="store_true", help="normalize dataset", required=False)
     parser.add_argument("--plot-emd-corr", action="store_true", help="plot emd correlation plot at end of training", required=False)
+    parser.add_argument("--drop-old-losses", action="store_true", help="don't load in old loss values", required=False)
     parser.add_argument("--plot-scale", choices=['cartesian','hadronic','standardized'],
                         help='classes for x-axis scaling for plotting reconstructions', default='cartesian', required=False)
     args = parser.parse_args()
