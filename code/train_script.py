@@ -25,7 +25,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 multi_gpu = torch.cuda.device_count()>1
 
 @torch.no_grad()
-def test(model, loader, total, batch_size, loss_ftn_obj, gen_emd_corr=False):
+def test(model, loader, total, batch_size, loss_ftn_obj, gen_emd_corr=False, scaler=None):
     model.eval()
 
     sum_loss = 0.
@@ -37,7 +37,7 @@ def test(model, loader, total, batch_size, loss_ftn_obj, gen_emd_corr=False):
 
     for i,data in t:
 
-        batch_loss, batch_output = forward_loss(model, data, loss_ftn_obj, device, multi_gpu)
+        batch_loss, batch_output = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
 
         batch_loss = batch_loss.item()
         sum_loss += batch_loss
@@ -53,7 +53,7 @@ def test(model, loader, total, batch_size, loss_ftn_obj, gen_emd_corr=False):
         return sum_loss / (i+1), in_parts, gen_parts, pred_emd
     return sum_loss / (i+1)
 
-def train(model, optimizer, loader, total, batch_size, loss_ftn_obj):
+def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None):
     model.train()
 
     sum_loss = 0.
@@ -61,7 +61,7 @@ def train(model, optimizer, loader, total, batch_size, loss_ftn_obj):
     for i,data in t:
         optimizer.zero_grad()
 
-        batch_loss, batch_output = forward_loss(model, data, loss_ftn_obj, device, multi_gpu)
+        batch_loss, batch_output = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
         batch_loss.backward()
         optimizer.step()
 
@@ -115,6 +115,7 @@ def main(args):
     iqr_prop = None
     if 'iqr' in args.loss:
         iqr_prop = get_iqr_proportions(train_dataset)
+    scaler = None
     if args.standardize:
         scaler = standardize(train_dataset, valid_dataset, test_dataset)
 
@@ -137,7 +138,7 @@ def main(args):
     if osp.isfile(modpath):
         model.load_state_dict(torch.load(modpath, map_location=device))
         model.to(device)
-        best_valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj)
+        best_valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
         print('Loaded model')
         print(f'Saved model valid loss: {best_valid_loss}')
         if osp.isfile(osp.join(save_dir,'losses.pt')):
@@ -156,12 +157,12 @@ def main(args):
     loss = best_valid_loss
     for epoch in range(start_epoch, n_epochs):
 
-        loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj)
+        loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
         # if epoch % 5 == 0 and args.loss == 'emd_loss':
-        #     valid_loss, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, True)
+        #     valid_loss, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, True, scaler=scaler)
         #     epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch)
         # else:
-        valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj)
+        valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
 
         scheduler.step(valid_loss)
         train_losses.append(loss)

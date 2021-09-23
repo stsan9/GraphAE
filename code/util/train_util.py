@@ -19,12 +19,23 @@ def get_model(modname, **kwargs):
     return model
 
 # helper to perform correct loss
-def forward_loss(model, data, loss_ftn_obj, device, multi_gpu):
+def forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler=None):
     
     if not multi_gpu:
         data = data.to(device)
 
-    if 'emd_loss' in loss_ftn_obj.name or loss_ftn_obj.name == 'chamfer_loss':
+    if 'emd_loss' in loss_ftn_obj.name:
+        batch_output = model(data)
+        if multi_gpu:
+            data = Batch.from_data_list(data).to(device)
+        y = data.x
+        batch = data.batch
+        if scaler != None:
+            batch_output = scaler.inverse_transform(batch_output)
+            y = scaler.inverse_transform(y)
+        batch_loss = loss_ftn_obj.loss_ftn(batch_output, y, batch)
+
+    if loss_ftn_obj.name == 'chamfer_loss':
         batch_output = model(data)
         if multi_gpu:
             data = Batch.from_data_list(data).to(device)
@@ -33,7 +44,7 @@ def forward_loss(model, data, loss_ftn_obj, device, multi_gpu):
         batch_loss = loss_ftn_obj.loss_ftn(batch_output, y, batch)
 
     elif loss_ftn_obj.name == 'emd_in_forward':
-        _, batch_loss = model(data)
+        _, batch_loss = model(data, scaler)
         batch_loss = batch_loss.mean()
 
     elif loss_ftn_obj.name == 'vae_loss':
