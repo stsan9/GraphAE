@@ -38,7 +38,7 @@ def plot_reco_difference(input_fts, reco_fts, model_fname, save_path, feature='h
     Path(save_path).mkdir(parents=True, exist_ok=True)
     label = ['$p_x~[GeV]$', '$p_y~[GeV]$', '$p_z~[GeV]$']
     feat = ['px', 'py', 'pz']
-    if feature == 'hadronic' or 'standardized':
+    if feature == 'hadronic' or feature == 'standardized':
         label = ['$p_T$', '$eta$', '$phi$']
         feat = ['pt', 'eta', 'phi']
 
