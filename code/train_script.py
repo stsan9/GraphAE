@@ -166,60 +166,60 @@ def main(args):
         model = DataParallel(model)
         model.to(device)
 
-    # Training loop
-    n_epochs = 200
-    stale_epochs = 0
-    loss = best_valid_loss
-    for epoch in range(start_epoch, n_epochs):
+    # # Training loop
+    # n_epochs = 200
+    # stale_epochs = 0
+    # loss = best_valid_loss
+    # for epoch in range(start_epoch, n_epochs):
 
-        loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
-        if 'emd_loss' in loss_ftn_obj.name:
-            loss, ef_emd = loss
-            train_true_emd.append(ef_emd)
-        # if epoch % 5 == 0 and args.loss == 'emd_loss':
-        #     valid_loss, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, True, scaler=scaler)
-        #     epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch)
-        # else:
-        valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
-        if 'emd_loss' in loss_ftn_obj.name:
-            valid_loss, ef_emd = valid_loss
-            valid_true_emd.append(ef_emd)
+    #     loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
+    #     if 'emd_loss' in loss_ftn_obj.name:
+    #         loss, ef_emd = loss
+    #         train_true_emd.append(ef_emd)
+    #     # if epoch % 5 == 0 and args.loss == 'emd_loss':
+    #     #     valid_loss, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, True, scaler=scaler)
+    #     #     epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch)
+    #     # else:
+    #     valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
+    #     if 'emd_loss' in loss_ftn_obj.name:
+    #         valid_loss, ef_emd = valid_loss
+    #         valid_true_emd.append(ef_emd)
 
-        scheduler.step(valid_loss)
-        train_losses.append(loss)
-        valid_losses.append(valid_loss)
-        print('Epoch: {:02d}, Training Loss:   {:.4f}'.format(epoch, loss))
-        print('               Validation Loss: {:.4f}'.format(valid_loss))
+    #     scheduler.step(valid_loss)
+    #     train_losses.append(loss)
+    #     valid_losses.append(valid_loss)
+    #     print('Epoch: {:02d}, Training Loss:   {:.4f}'.format(epoch, loss))
+    #     print('               Validation Loss: {:.4f}'.format(valid_loss))
 
-        if valid_loss < best_valid_loss:
-            best_valid_loss = valid_loss
-            print('New best model saved to:',modpath)
-            if multi_gpu:
-                torch.save(model.module.state_dict(), modpath)
-            else:
-                torch.save(model.state_dict(), modpath)
-            torch.save((train_losses, valid_losses, epoch+1), osp.join(save_dir,'losses.pt'))
-            stale_epochs = 0
-        else:
-            stale_epochs += 1
-            print(f'Stale epoch: {stale_epochs}\nBest: {best_valid_loss}\nCurr: {valid_loss}')
-        if stale_epochs >= args.patience:
-            print('Early stopping after %i stale epochs'%args.patience)
-            break
+    #     if valid_loss < best_valid_loss:
+    #         best_valid_loss = valid_loss
+    #         print('New best model saved to:',modpath)
+    #         if multi_gpu:
+    #             torch.save(model.module.state_dict(), modpath)
+    #         else:
+    #             torch.save(model.state_dict(), modpath)
+    #         torch.save((train_losses, valid_losses, epoch+1), osp.join(save_dir,'losses.pt'))
+    #         stale_epochs = 0
+    #     else:
+    #         stale_epochs += 1
+    #         print(f'Stale epoch: {stale_epochs}\nBest: {best_valid_loss}\nCurr: {valid_loss}')
+    #     if stale_epochs >= args.patience:
+    #         print('Early stopping after %i stale epochs'%args.patience)
+    #         break
 
-    # model training done
-    train_epochs = list(range(epoch+1))
-    early_stop_epoch = epoch - stale_epochs
-    loss_curves(train_epochs, early_stop_epoch, train_losses, valid_losses, save_dir, train_true_emd, valid_true_emd)
+    # # model training done
+    # train_epochs = list(range(epoch+1))
+    # early_stop_epoch = epoch - stale_epochs
+    # loss_curves(train_epochs, early_stop_epoch, train_losses, valid_losses, save_dir, train_true_emd, valid_true_emd)
 
-    # load best model
-    del model
-    torch.cuda.empty_cache()
-    model = get_model(args.model, input_dim=input_dim, big_dim=big_dim, hidden_dim=hidden_dim, emd_modname=args.emd_model_name)
-    model.load_state_dict(torch.load(modpath))
-    if multi_gpu:
-        model = DataParallel(model)
-    model.to(device)
+    # # load best model
+    # del model
+    # torch.cuda.empty_cache()
+    # model = get_model(args.model, input_dim=input_dim, big_dim=big_dim, hidden_dim=hidden_dim, emd_modname=args.emd_model_name)
+    # model.load_state_dict(torch.load(modpath))
+    # if multi_gpu:
+    #     model = DataParallel(model)
+    # model.to(device)
 
     inverse_standardization = args.standardize and args.plot_scale != 'standardized'
     plot_reco_for_loader(model, train_loader, device, scaler, inverse_standardization, model_fname, osp.join(save_dir, 'reconstruction_post_train', 'train'), args.plot_scale)
