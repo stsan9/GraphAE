@@ -96,7 +96,7 @@ def bump_hunter(nonoutlier_mass, outlier_mass, save_name):
               12827, 13272, 13732, 14000])
 
     # first perform a fit to improve background prediciton
-    bins = signal_mjj[(signal_mjj >= 3147) * (signal_mjj <= 6099)]
+    bins = signal_mjj[(signal_mjj >= 3279) * (signal_mjj <= 6099)]
 
     xmin = bins[0]
     xmax = bins[-1]
