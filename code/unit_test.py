@@ -115,10 +115,11 @@ def test_plot_emd_corr():
     dataset = [data for data in chain.from_iterable(gdata)]
 
     random.Random(0).shuffle(dataset)
-    small_sample = dataset[:int(0.10 * len(dataset))]
-    loader = DataLoader(small_sample, batch_size=1)
+    batch_size = 256
+    train_data = dataset[:int(0.8 * len(dataset))]
+    test_loader = DataLoader(dataset[int(0.8 * len(dataset)):], batch_size=256)
 
-    data_x = torch.cat([d.x for d in small_sample])
+    data_x = torch.cat([d.x for d in train_data])
     scaler = Standardizer()
     scaler.fit(data_x)
 
@@ -128,36 +129,8 @@ def test_plot_emd_corr():
     model.eval()
 
     lf = LossFunction('emd_loss')
+    plot_emd_corr(model, test_loader, lf.loss_ftn, args.plot_dir, 'emd_corr', scaler, device)
 
-    pred_emd = []
-    true_emd = []
-    for batch in tqdm(loader):
-        batch.x[:,:] = scaler.transform(batch.x)
-        batch.to(device)
-        out = model(batch)
-        try:
-            out = scaler.inverse_transform(out.detach().cpu())
-            jet_in = scaler.inverse_transform(batch.x.detach().cpu())
-            emd_val = ef.emd.emd(jet_in.numpy(), out.numpy(), n_iter_max=500000)
-        except RuntimeError as err:
-            Path('debug').mkdir(exist_ok=True)
-            np.save('debug/emd_jet_in', jet_in.numpy())
-            np.save('debug/emd_jet_out', out.numpy())
-            raise RuntimeError(err)
-
-        true_emd.append(emd_val)
-
-        batch.x[:,:] = scaler.inverse_transform(batch.x.detach().cpu()).to(device)
-        out = scaler.inverse_transform(out.detach().cpu()).to(device)
-        emd_loss = lf.loss_ftn(batch.x, out, batch.batch, mean=False)
-        pred_emd.append(emd_loss)
-
-    pred_emd = torch.cat(pred_emd).numpy()
-    save_dir = args.plot_dir
-    save_name = 'emd_correlation'
-
-    plot_emd_corr(true_emd, pred_emd, save_dir, save_name)
 
 if __name__ == '__main__':
-    # test_plot_emd_corr()
-    test_reco_relative_diff()
+    test_plot_emd_corr()

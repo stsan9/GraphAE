@@ -69,18 +69,21 @@ class EdgeNetEMD(nn.Module):
         emd_model = load_emd_model(emd_modname, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
         self.emd_model = emd_model.requires_grad_(False)
 
-    def emd_loss(self, x, y, batch):
+    def emd_loss(self, x, y, batch, scaler):
         self.emd_model.eval()
+        if scaler != None:
+            x = scaler.inverse_transform(x)
+            y = scaler.inverse_transform(y)
         data = preprocess_emdnn_input(x, y, batch)
         out = self.emd_model(data)
         emd = out[0]
         return emd
 
-    def forward(self, data):
+    def forward(self, data, scaler=None):
         x = self.batchnorm(data.x)
         x = self.encoder(x,data.edge_index)
         x = self.decoder(x,data.edge_index)
-        loss = self.emd_loss(x, data.x, data.batch)
+        loss = self.emd_loss(x, data.x, data.batch, scaler)
         return x, loss
     
 # GVAE based on EdgeNet model above.

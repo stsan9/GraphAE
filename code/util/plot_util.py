@@ -4,7 +4,9 @@ import mplhep as hep
 import os.path as osp
 import energyflow as ef
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 from pathlib import Path
+from torch_geometric.utils import to_dense_batch
 
 plt.style.use(hep.style.CMS)
 
@@ -36,7 +38,7 @@ def plot_reco_difference(input_fts, reco_fts, model_fname, save_path, feature='h
     Path(save_path).mkdir(parents=True, exist_ok=True)
     label = ['$p_x~[GeV]$', '$p_y~[GeV]$', '$p_z~[GeV]$']
     feat = ['px', 'py', 'pz']
-    if feature == 'hadronic' or 'standardized':
+    if feature == 'hadronic' or feature == 'standardized':
         label = ['$p_T$', '$eta$', '$phi$']
         feat = ['pt', 'eta', 'phi']
 
@@ -51,7 +53,7 @@ def plot_reco_difference(input_fts, reco_fts, model_fname, save_path, feature='h
         elif feature == 'hadronic':
             bins = np.linspace(-2, 2, 101)
             if i == 0:  # different bin size for pt rel
-                bins = np.linspace(-0.05, 0.1, 101)
+                bins = np.linspace(-0.005, 0.01, 101)
         else:
             bins = np.linspace(-1, 1, 101)
         plt.ticklabel_format(useMathText=True)
@@ -95,28 +97,59 @@ def plot_reco_for_loader(model, loader, device, scaler, inverse_scale, model_fna
     plot_reco_difference(input_fts, reco_fts, model_fname, save_dir, feature_format)
 
 
-def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path):
+def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, train_true_emd=None, valid_true_emd=None):
     '''
         Graph our training and validation losses.
     '''
-    plt.plot(epochs, train_loss, valid_loss)
-    plt.xticks(epochs)
-    ax = plt.gca()
-    ax.set_yscale('log')
-    if max(epochs) < 60:
-        ax.locator_params(nbins=10, axis='x')
+    if train_true_emd == None or valid_true_emd == None:
+        plt.plot(epochs, train_loss, valid_loss)
+        plt.xticks(epochs)
+        ax = plt.gca()
+        ax.set_yscale('log')
+        if max(epochs) < 60:
+            ax.locator_params(nbins=10, axis='x')
+        else:
+            ax.set_xticks(np.arange(0, max(epochs), 20))
+        if early_stop_epoch != None:
+            plt.axvline(x=early_stop_epoch, linestyle='--')
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
+        plt.legend(['Train', 'Validation', 'Best model'])
+        plt.savefig(osp.join(save_path, 'loss_curves.pdf'))
+        plt.savefig(osp.join(save_path, 'loss_curves.png'))
+        plt.close()
     else:
-        ax.set_xticks(np.arange(0, max(epochs), 20))
-    if early_stop_epoch != None:
-        plt.axvline(x=early_stop_epoch, linestyle='--')
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.legend(['Train', 'Validation', 'Best model'])
-    plt.savefig(osp.join(save_path, 'loss_curves.pdf'))
-    plt.savefig(osp.join(save_path, 'loss_curves.png'))
-    plt.close()
+        plt.plot(epochs, train_loss)
+        plt.plot(epochs, valid_loss, label='Validation')
+        plt.plot(epochs, train_true_emd, label='True EMD (Train)')
+        plt.plot(epochs, valid_true_emd, label='True EMD (Valid.)')
+        plt.xticks(epochs)
+        ax = plt.gca()
+        ax.set_yscale('log')
+        if max(epochs) < 60:
+            ax.locator_params(nbins=10, axis='x')
+        else:
+            ax.set_xticks(np.arange(0, max(epochs), 20))
+        if early_stop_epoch != None:
+            plt.axvline(x=early_stop_epoch, linestyle='--', label='Best model')
+        plt.xlabel("Epochs")
+        plt.ylabel("EMD-NN Loss")
+        plt.legend()
+        plt.savefig(osp.join(save_path, 'loss_curves.pdf'))
+        plt.savefig(osp.join(save_path, 'loss_curves.png'))
+        plt.close()
 
-def gen_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch):
+
+def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch):
+    """
+    Plot emd correlation plot at this epoch
+
+    :param in_parts: (batch, n, feat) torch tensor input jets
+    :param gen_parts: (batch, n, feat) torch tensor for model reco
+    :param pred_emd: list of predicted emds from emd-nn
+    :param save_dir: directory to save plot
+    :param epoch: epoch correlation plot is made for
+    """
 
     save_dir = osp.join(save_dir, 'emd_corr_plots')
     Path(save_dir).mkdir(exist_ok=True)
@@ -200,17 +233,66 @@ def reco_relative_diff(jet_in, jet_out, save_dir, save_name):
     plt.savefig(osp.join(save_dir, save_name + '_' + feat))
     plt.close()
 
-def plot_emd_corr(true_emd, pred_emd, save_dir, save_name):
+@torch.no_grad()
+def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, device):
     """
-    :param true_emd: np array
-    :param pred_emd: np array
+    :param model: GAE
+    :param loader: torch dataloader
+    :param emd_loss_ftn: function for predicting emd using nn
+    :param save_dir: where to save plots
+    :param save_name: name to save plot as
+    :param scaler: prefitted Standardizer
+    :param device: torch device cpu/gpu
     """
-    max_range = max(np.max(true_emd), np.max(pred_emd))
-    fig, ax = plt.subplots(figsize =(5, 5))
-    plt.hist2d(true_emd, pred_emd)
-    x_bins = np.linspace(0, max_range, 101)
-    y_bins = np.linspace(0, max_range, 101)
-    ax.set_xlabel('True EMD')  
-    ax.set_ylabel('Pred. EMD')
-    plt.savefig(osp.join(save_dir, save_name))
-    plt.close()
+    def make_plots(true_emd, pred_emd):
+        """
+        :param true_emd: np array
+        :param pred_emd: np array
+        """
+        # plot figures
+        plt.rcParams['figure.figsize'] = (4,4)
+        plt.rcParams['figure.dpi'] = 120
+        plt.rcParams['font.family'] = 'serif'
+
+        max_range = max(np.max(true_emd), np.max(pred_emd))
+        fig, ax = plt.subplots(figsize =(9, 9)) 
+        plt.hist(true_emd, bins=np.linspace(0, max_range , 31),label='True', alpha=0.5)
+        plt.hist(pred_emd, bins=np.linspace(0, max_range, 31),label = 'Pred.', alpha=0.5)
+        plt.legend()
+        ax.set_xlabel('EMD') 
+        fig.savefig(osp.join(save_dir, save_name + '2'))
+
+        fig, ax = plt.subplots(figsize =(9, 9))
+        x_bins = np.linspace(0, max_range, 31)
+        y_bins = np.linspace(0, max_range, 31)
+        print(len(true_emd))
+        plt.hist2d(true_emd, pred_emd, bins=[x_bins, y_bins])
+        ax.set_xlabel('True EMD')  
+        ax.set_ylabel('Pred. EMD')
+        plt.savefig(osp.join(save_dir, save_name))
+        plt.close()
+
+    pred_emd = []
+    true_emd = []
+    model.eval()
+    for b in tqdm(loader, desc='Calculating True/Pred. EMDs'):
+        b = b.clone()
+        b.to(device)
+
+        # get gae reconstruction
+        jet_reco = model(b)
+
+        # inverse scales to feed into emd network
+        jet_reco = scaler.inverse_transform(jet_reco)
+        jet_in = scaler.inverse_transform(b.x)
+        pred = emd_loss_ftn(jet_in, jet_reco, b.batch, mean=False).reshape(-1).tolist()
+        pred_emd += pred
+
+        # calc true emd
+        jet_reco[jet_reco < 0] = 0  # no negative pt to calc true emd
+        jet_reco = to_dense_batch(x=jet_reco, batch=b.batch)[0].detach().cpu().numpy()
+        jet_in = to_dense_batch(x=jet_in, batch=b.batch)[0].detach().cpu().numpy()
+        for j1, j2 in zip(jet_reco, jet_in):
+            emd_val = ef.emd.emd(j1, j2)
+            true_emd.append(emd_val)
+    make_plots(true_emd, pred_emd)
