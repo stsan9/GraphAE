@@ -19,6 +19,7 @@ from datagen.graph_data_gae import GraphDataset
 from util.train_util import get_model, forward_loss
 from util.preprocessing import get_iqr_proportions, standardize
 from util.plot_util import loss_curves, epoch_emd_corr, plot_reco_for_loader, plot_emd_corr
+from util.adverserial import train_emd_model
 
 torch.manual_seed(0)
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

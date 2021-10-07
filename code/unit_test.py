@@ -14,6 +14,7 @@ from datagen.graph_data_gae import GraphDataset
 from util.train_util import get_model, forward_loss
 from util.plot_util import *
 from util.loss_util import LossFunction
+from util.adverserial import train_emd_model
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -131,6 +132,33 @@ def test_plot_emd_corr():
     lf = LossFunction('emd_loss')
     plot_emd_corr(model, test_loader, lf.loss_ftn, args.plot_dir, 'emd_corr', scaler, device)
 
+def test_train_emd_model():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mod-path', type=str, help='gae model save file', required=True)
+    args = parser.parse_args()
+
+    gdata = GraphDataset(root='/anomalyvol/data/bb_train_sets/test_rel/', bb=0)
+    dataset = [data for data in chain.from_iterable(gdata)]
+
+    random.Random(0).shuffle(dataset)
+    batch_size = 256
+    train_data = dataset[:int(0.8 * len(dataset))]
+    test_loader = DataLoader(dataset[int(0.8 * len(dataset)):], batch_size=256)
+
+    data_x = torch.cat([d.x for d in train_data])
+    scaler = Standardizer()
+    scaler.fit(data_x)
+
+    model = get_model('EdgeNet', input_dim=3, hidden_dim=2, big_dim=32, emd_modname=None)
+    model.load_state_dict(torch.load(args.mod_path, map_location=device))
+    model.to(device)
+    model.eval()
+
+    lf = LossFunction('emd_loss')
+    emd_model = lf.emd_model
+    optimizer = torch.optim.Adam(emd_model.parameters(), lr = 0.01)
+    train_emd_model(model, emd_model, optimizer, test_loader, scaler)
 
 if __name__ == '__main__':
-    test_plot_emd_corr()
+    test_train_emd_model()
