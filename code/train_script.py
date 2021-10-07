@@ -208,6 +208,8 @@ def main(args):
             else:
                 torch.save(model.state_dict(), modpath)
             torch.save((train_losses, valid_losses, epoch+1), osp.join(save_dir,'losses.pt'))
+            if 'emd_loss' in loss_ftn_obj.name:
+                torch.save({'train_true_emd':train_true_emd, 'valid_true_emd':valid_true_emd}, osp.join(save_dir,'true_emds.pt'))
             stale_epochs = 0
         else:
             stale_epochs += 1

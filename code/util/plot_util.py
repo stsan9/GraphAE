@@ -53,7 +53,7 @@ def plot_reco_difference(input_fts, reco_fts, model_fname, save_path, feature='h
         elif feature == 'hadronic':
             bins = np.linspace(-2, 2, 101)
             if i == 0:  # different bin size for pt rel
-                bins = np.linspace(-0.005, 0.01, 101)
+                bins = np.linspace(-0.05, 0.1, 101)
         else:
             bins = np.linspace(-1, 1, 101)
         plt.ticklabel_format(useMathText=True)
@@ -119,8 +119,8 @@ def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, tra
         plt.savefig(osp.join(save_path, 'loss_curves.png'))
         plt.close()
     else:
-        plt.plot(epochs, train_loss)
-        plt.plot(epochs, valid_loss, label='Validation')
+        plt.plot(epochs, train_loss, label='Pred EMD (Train)')
+        plt.plot(epochs, valid_loss, label='Pred EMD (Valid)')
         plt.plot(epochs, train_true_emd, label='True EMD (Train)')
         plt.plot(epochs, valid_true_emd, label='True EMD (Valid.)')
         plt.xticks(epochs)
