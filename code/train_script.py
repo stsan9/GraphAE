@@ -88,6 +88,8 @@ def main(args):
         exit('Batch size too small')
     if args.loss == 'deepemd_loss' and args.batch_size > 1:
         exit('deepemd_loss can only be used with batch_size of 1 for now')
+    if args.train_emd_adverserially and args.loss != 'emd_loss':
+        exit('Must use emd_loss to train emd network adverserially')
 
     # make a folder for the graphs of this model
     Path(args.output_dir).mkdir(exist_ok=True)
@@ -129,6 +131,9 @@ def main(args):
         scaler = standardize(train_dataset, valid_dataset, test_dataset)
 
     loss_ftn_obj = LossFunction(args.loss, emd_model_name=args.emd_model_name, device=device, iqr_prop=iqr_prop)
+    if args.train_emd_adverserially:
+        emd_model = loss_ftn_obj.emd_model
+        emd_optimizer = torch.optim.Adam(emd_model.parameters(), lr = args.lr)
 
     # model
     input_dim = 3
@@ -142,7 +147,7 @@ def main(args):
     # load model
     valid_losses = []
     train_losses = []
-    train_true_emd = [] if 'emd_loss' in loss_ftn_obj.name else None
+    train_true_emd = [] if 'emd_loss' in loss_ftn_obj.name else None    # energyflow emd with gae reco for train epochs
     valid_true_emd = [] if 'emd_loss' in loss_ftn_obj.name else None
     start_epoch = 0
     modpath = osp.join(save_dir, model_fname+'.best.pth')
@@ -177,10 +182,6 @@ def main(args):
         if 'emd_loss' in loss_ftn_obj.name:
             loss, ef_emd = loss
             train_true_emd.append(ef_emd)
-        # if epoch % 5 == 0 and args.loss == 'emd_loss':
-        #     valid_loss, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, True, scaler=scaler)
-        #     epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch)
-        # else:
         valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
         if 'emd_loss' in loss_ftn_obj.name:
             valid_loss, ef_emd = valid_loss
@@ -259,6 +260,7 @@ if __name__ == '__main__':
                         default=0, required=False)
     parser.add_argument("--standardize", action="store_true", help="normalize dataset", required=False)
     parser.add_argument("--plot-emd-corr", action="store_true", help="plot emd correlation plot at end of training", required=False)
+    parser.add_argument("--train-emd-adverserially", action="store_true", help="train emd-nn loss function with (input, gae reco)", required=False)
     parser.add_argument("--drop-old-losses", action="store_true", help="don't load in old loss values", required=False)
     parser.add_argument("--plot-scale", choices=['cartesian','hadronic','standardized'],
                         help='classes for x-axis scaling for plotting reconstructions', default='cartesian', required=False)

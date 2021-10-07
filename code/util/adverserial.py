@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from itertools import chain
 from util.loss_util import preprocess_emdnn_input
 
-def train_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, num_procs=1, device=torch.device('cuda:0')):
+def train_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, device=torch.device('cuda:0')):
     """
     Train emd model on (input, gae_reco) for one epoch.
 
@@ -17,22 +17,18 @@ def train_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, num_pro
     :param emd_optimizer: torch optimizer for emd_model
     :param loader: torch dataloader
     :param scaler: StandardScaler for reversing data to unstandardized form
-    :param num_procs: how many threads to execute for emd calculation
     :param device: device model is on
     :return: average loss of EMD-NN
     """
-    def calc_true_emd(jets1, jets2):
+    def calc_true_emd(jet1, jet2):
         """
         energyflow calculation of emd
 
-        :param jets1: list of numpy arrays (n x [pt eta phi])
-        :param jets2: list of numpy arrays (n x [pt eta phi])
+        :param jet1: numpy array (n x [pt eta phi])
+        :param jet2: numpy array (n x [pt eta phi])
         """
-        true_emds = []
-        for j1, j2 in zip(jets1, jets2):
-            emd = ef.emd.emd(j1, j2)
-            true_emds.append(emd)
-        return true_emds
+        emd = ef.emd.emd(jet1, jet2)
+        return emd
 
     sum_loss = 0
 
@@ -54,17 +50,9 @@ def train_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, num_pro
         jet_reco_np = to_dense_batch(x=jet_reco, batch=b.batch)[0].detach().cpu().numpy()
         jet_in_np = to_dense_batch(x=jet_in, batch=b.batch)[0].detach().cpu().numpy()
 
-        # split data into chunks for multithreaded calculation of true emd
-        jet_chunks_len = len(jet_in_np) // num_procs
-        jet_chunks_in = []
-        jet_chunks_reco = []
-        for i in range(0, num_procs, jet_chunks_len):
-            jet_chunks_in.append(jet_in_np[i:i + jet_chunks_len])
-            jet_chunks_reco.append(jet_reco_np[i:i + jet_chunks_len])
-
-        with ThreadPoolExecutor(max_workers=num_procs) as executor:
-            emd_lists = executor.map(calc_true_emd, jet_chunks_in, jet_chunks_reco)
-        emds = list(chain.from_iterable(emd_lists))
+        with ThreadPoolExecutor() as executor:
+            emds = executor.map(calc_true_emd, jet_in_np, jet_reco_np)
+        emds = [e for e in emds]
 
         # emd nn formatting
         if (not jet_reco.is_cuda) or (not jet_in.is_cuda):
@@ -80,7 +68,6 @@ def train_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, num_pro
         emd_optimizer.zero_grad()
         loss.backward()
         emd_optimizer.step()
-
 
         loss = loss.item()
         sum_loss += loss
