@@ -144,7 +144,7 @@ def test_train_emd_model():
     random.Random(0).shuffle(dataset)
     batch_size = 256
     train_data = dataset[:int(0.8 * len(dataset))]
-    test_loader = DataLoader(dataset[int(0.8 * len(dataset)):], batch_size=256)
+    test_loader = DataLoader(train_data, batch_size=256)
 
     data_x = torch.cat([d.x for d in train_data])
     scaler = Standardizer()

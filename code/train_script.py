@@ -130,8 +130,9 @@ def main(args):
     if args.standardize:
         scaler = standardize(train_dataset, valid_dataset, test_dataset)
 
+    # loss function
     loss_ftn_obj = LossFunction(args.loss, emd_model_name=args.emd_model_name, device=device, iqr_prop=iqr_prop)
-    if args.train_emd_adverserially:
+    if args.train_emd_adverserially:    # set up parameters for training emd nn with gae
         emd_model = loss_ftn_obj.emd_model
         emd_optimizer = torch.optim.Adam(emd_model.parameters(), lr = args.lr)
 
@@ -177,11 +178,17 @@ def main(args):
     stale_epochs = 0
     loss = best_valid_loss
     for epoch in range(start_epoch, n_epochs):
+        print('Epoch: {:02d}'.format(epoch))
+
+        if args.train_emd_adverserially:    # 
+            emd_train_loss = train_emd_model(model, emd_model, emd_optimizer, train_loader, scaler, device)
+            print('EMD-NN Training Loss: {:.4f}'.format(emd_train_loss))
 
         loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
         if 'emd_loss' in loss_ftn_obj.name:
             loss, ef_emd = loss
             train_true_emd.append(ef_emd)
+
         valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
         if 'emd_loss' in loss_ftn_obj.name:
             valid_loss, ef_emd = valid_loss
@@ -190,8 +197,8 @@ def main(args):
         scheduler.step(valid_loss)
         train_losses.append(loss)
         valid_losses.append(valid_loss)
-        print('Epoch: {:02d}, Training Loss:   {:.4f}'.format(epoch, loss))
-        print('               Validation Loss: {:.4f}'.format(valid_loss))
+        print('Training Loss: {:.4f}'.format(loss))
+        print('Validation Loss: {:.4f}'.format(valid_loss))
 
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
@@ -208,6 +215,7 @@ def main(args):
         if stale_epochs >= args.patience:
             print('Early stopping after %i stale epochs'%args.patience)
             break
+        print("=" * 50)
 
     # model training done
     train_epochs = list(range(epoch+1))
