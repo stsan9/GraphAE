@@ -12,7 +12,7 @@ def train_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, device=
     """
     Train emd model on (input, gae_reco) for one epoch.
 
-    :param gae_model: pytorch in GAE
+    :param gae_model: GAE pytorch model to generate reco input
     :param emd_model: EMD-NN to train
     :param emd_optimizer: torch optimizer for emd_model
     :param loader: torch dataloader
