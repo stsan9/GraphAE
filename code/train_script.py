@@ -18,7 +18,7 @@ from util.loss_util import LossFunction
 from datagen.graph_data_gae import GraphDataset
 from util.train_util import get_model, forward_loss
 from util.preprocessing import get_iqr_proportions, standardize
-from util.plot_util import loss_curves, epoch_emd_corr, plot_reco_for_loader, plot_emd_corr
+from util.plot_util import loss_curves, plot_reco_for_loader, plot_emd_corr
 from util.adversarial import train_emd_model
 
 torch.manual_seed(0)
@@ -26,15 +26,11 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 multi_gpu = torch.cuda.device_count()>1
 
 @torch.no_grad()
-def test(model, loader, total, batch_size, loss_ftn_obj, gen_emd_corr=False, scaler=None):
+def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None):
     model.eval()
 
     sum_loss = 0.
     t = tqdm.tqdm(enumerate(loader),total=total/batch_size)
-    if gen_emd_corr:
-        in_parts = []
-        gen_parts = []
-        pred_emd = []
 
     for i,data in t:
 
@@ -47,13 +43,6 @@ def test(model, loader, total, batch_size, loss_ftn_obj, gen_emd_corr=False, sca
         t.set_description('eval loss = %.7f' % (batch_loss))
         t.refresh() # to show immediately the update
 
-        if gen_emd_corr:
-            in_parts.append(data.x.detach().cpu().numpy())
-            gen_parts.append(batch_output.detach().cpu().numpy())
-            pred_emd.append(batch_loss)
-
-    if gen_emd_corr:
-        return sum_loss / (i+1), in_parts, gen_parts, pred_emd
     if 'emd_loss' in loss_ftn_obj.name:
         return sum_loss / (i+1), true_emd
     return sum_loss / (i+1)
@@ -181,10 +170,11 @@ def main(args):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=4, threshold=1e-6)
 
     # Training loop
-    n_epochs = 200
+    n_epochs = args.epochs
     stale_epochs = 0
     loss = best_valid_loss
     for epoch in range(start_epoch, n_epochs):
+        print("=" * 50)
         print('Epoch: {:02d}'.format(epoch))
 
         if args.train_emd_adversarially:
@@ -207,7 +197,7 @@ def main(args):
         print('Training Loss: {:.4f}'.format(loss))
         print('Validation Loss: {:.4f}'.format(valid_loss))
 
-        if valid_loss < best_valid_loss:
+        if valid_loss < best_valid_loss or args.train_emd_adversarially:
             stale_epochs = 0
             best_valid_loss = valid_loss
 
@@ -232,7 +222,6 @@ def main(args):
         if stale_epochs >= args.patience:
             print('Early stopping after %i stale epochs'%args.patience)
             break
-        print("=" * 50)
 
     # model training done
     train_epochs = list(range(epoch+1))
@@ -275,6 +264,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, help='batch size', default=2, required=False)
     parser.add_argument('--lr', type=float, help='learning rate', default=1e-3, required=False)
     parser.add_argument('--patience', type=int, help='patience', default=10, required=False)
+    parser.add_argument('--epochs', type=int, help='max number of epochs', default=200, required=False)
     parser.add_argument('--loss', choices=[m for m in dir(LossFunction) if not m.startswith('__')], 
                         help='loss function', required=True)
     parser.add_argument('--emd-model-name', choices=[osp.basename(x).split('.')[0] for x in glob.glob('/anomalyvol/emd_models/*')], 
