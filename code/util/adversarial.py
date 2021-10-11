@@ -10,11 +10,11 @@ from util.loss_util import preprocess_emdnn_input
 
 def train_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, device=torch.device('cuda:0')):
     """
-    Train emd model on (input, gae_reco) for one epoch.
+    Train emd model on (input, gae_reco) for one epoch. Can use for validation if emd_optimizer is None.
 
     :param gae_model: GAE pytorch model to generate reco input
     :param emd_model: EMD-NN to train
-    :param emd_optimizer: torch optimizer for emd_model
+    :param emd_optimizer: torch optimizer for emd_model; None for validation
     :param loader: torch dataloader
     :param scaler: StandardScaler for reversing data to unstandardized form
     :param device: device model is on
@@ -54,24 +54,30 @@ def train_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, device=
             emds = executor.map(calc_true_emd, jet_in_np, jet_reco_np)
         emds = [e for e in emds]
 
-        # emd nn formatting
+        # emd nn input formatting
         if (not jet_reco.is_cuda) or (not jet_in.is_cuda):
             jet_reco.to(device)
             jet_in.to(device)
         emd_nn_inputs = preprocess_emdnn_input(jet_in, jet_reco, b.batch)
         emd_targets = torch.tensor(emds).to(device)
 
-        # train emd network
-        emd_preds = emd_model(emd_nn_inputs)[0] # index 0 to toss extra output
+        # emd network
+        if emd_optimizer == None:
+            with torch.no_grad():
+                emd_preds = emd_model(emd_nn_inputs)[0] # index 0 to toss extra output
+        else:
+            emd_preds = emd_model(emd_nn_inputs)[0] # index 0 to toss extra output
         emd_preds = emd_preds.squeeze()
+
         loss = F.mse_loss(emd_preds, emd_targets, reduction='mean')
-        emd_optimizer.zero_grad()
-        loss.backward()
-        emd_optimizer.step()
+        if emd_optimizer != None:
+            emd_optimizer.zero_grad()
+            loss.backward()
+            emd_optimizer.step()
 
         loss = loss.item()
         sum_loss += loss
-        t.set_description('emd-nn train loss = %.7f' % loss)
+        t.set_description('EMD-NN train loss = %.7f' % loss)
         t.refresh() # to show immediately the update
 
     # return average loss of emd network during training

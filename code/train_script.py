@@ -100,7 +100,6 @@ def main(args):
     test_dataset  = dataset[train_len + tv_len:]
     train_samples = len(train_dataset)
     valid_samples = len(valid_dataset)
-    test_samples = len(test_dataset)
     num_workers = args.num_workers
     if multi_gpu:
         train_loader = DataListLoader(train_dataset, batch_size=args.batch_size, num_workers=num_workers, pin_memory=True, shuffle=True)
@@ -136,6 +135,8 @@ def main(args):
     train_losses = []
     train_true_emd = [] if 'emd_loss' in loss_ftn_obj.name else None    # energyflow emd with gae reco for train epochs
     valid_true_emd = [] if 'emd_loss' in loss_ftn_obj.name else None
+    train_adv_loss = [] if args.train_emd_adversarially else None
+    valid_adv_loss = [] if args.train_emd_adversarially else None
     start_epoch = 0
     lr = args.lr
     modpath = osp.join(save_dir, model_fname+'.best.pth')
@@ -178,8 +179,17 @@ def main(args):
         print('Epoch: {:02d}'.format(epoch))
 
         if args.train_emd_adversarially:
-            emd_train_loss = train_emd_model(model, emd_model, emd_optimizer, train_loader, scaler, device)
-            print('EMD-NN Training Loss: {:.4f}'.format(emd_train_loss))
+            # train EMD-NN on input x GAE reco
+            prev_emd_valid_loss = 9999999
+            while True:
+                emd_train_loss = train_emd_model(model, emd_model, emd_optimizer, train_loader, scaler, device)
+                emd_valid_loss = train_emd_model(model, emd_model, None, train_loader, scaler, device)
+                if emd_valid_loss < prev_emd_valid_loss:    # early stop after 1 epoch
+                    prev_emd_valid_loss = emd_valid_loss
+                else:
+                    break
+                print('EMD-NN Training Loss: {:.4f}'.format(emd_train_loss))
+                print('EMD-NN Valid Loss: {:.4f}'.format(emd_valid_loss))
 
         loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
         if 'emd_loss' in loss_ftn_obj.name:
