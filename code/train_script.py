@@ -153,12 +153,12 @@ def main(args):
     if osp.isfile(modpath):
         model.load_state_dict(torch.load(modpath, map_location=device))
         model.to(device)
+        best_valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
+        if 'emd_loss' in loss_ftn_obj.name:
+            best_valid_loss, ef_emd = best_valid_loss
+        print(f'Loaded Model\nSaved model valid loss: {best_valid_loss}')
 
         if not args.drop_old_losses:    # use when swapping from pretrained network to new training w/ different loss
-            best_valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
-            if 'emd_loss' in loss_ftn_obj.name:
-                best_valid_loss, ef_emd = best_valid_loss
-
             if osp.isfile(osp.join(save_dir, 'train_status.pt')):
                 train_status = torch.load(osp.join(save_dir, 'train_status.pt'))
                 train_losses = train_status['train_losses']
@@ -167,7 +167,6 @@ def main(args):
                 lr = train_status['lr']
                 train_true_emd = train_status['train_true_emd']
                 valid_true_emd = train_status['valid_true_emd']
-            print(f'Loaded Model\nSaved model valid loss: {best_valid_loss}')
         else:
             best_valid_loss = 9999999
     else:
