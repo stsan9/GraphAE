@@ -142,27 +142,32 @@ def main(args):
     hidden_dim = args.lat_dim
     model = get_model(args.model, input_dim=input_dim, big_dim=big_dim, hidden_dim=hidden_dim, emd_modname=args.emd_model_name)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr = args.lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=4, threshold=1e-6)
-
-    # load model
+    # load model and previous training state
     valid_losses = []
     train_losses = []
     train_true_emd = [] if 'emd_loss' in loss_ftn_obj.name else None    # energyflow emd with gae reco for train epochs
     valid_true_emd = [] if 'emd_loss' in loss_ftn_obj.name else None
     start_epoch = 0
+    lr = args.lr
     modpath = osp.join(save_dir, model_fname+'.best.pth')
     if osp.isfile(modpath):
         model.load_state_dict(torch.load(modpath, map_location=device))
         model.to(device)
+
         if not args.drop_old_losses:    # use when swapping from pretrained network to new training w/ different loss
             best_valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
             if 'emd_loss' in loss_ftn_obj.name:
                 best_valid_loss, ef_emd = best_valid_loss
-            print('Loaded model')
-            print(f'Saved model valid loss: {best_valid_loss}')
-            if osp.isfile(osp.join(save_dir,'losses.pt')):
-                train_losses, valid_losses, start_epoch = torch.load(osp.join(save_dir,'losses.pt'))
+
+            if osp.isfile(osp.join(save_dir, 'train_status.pt')):
+                train_status = torch.load(osp.join(save_dir, 'train_status.pt'))
+                train_losses = train_status['train_losses']
+                valid_losses = train_status['valid_losses']
+                start_epoch = train_status['epoch']
+                lr = train_status['lr']
+                train_true_emd = train_status['train_true_emd']
+                valid_true_emd = train_status['valid_true_emd']
+            print(f'Loaded Model\nSaved model valid loss: {best_valid_loss}')
         else:
             best_valid_loss = 9999999
     else:
@@ -173,6 +178,9 @@ def main(args):
         model = DataParallel(model)
         model.to(device)
 
+    optimizer = torch.optim.Adam(model.parameters(), lr = lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=4, threshold=1e-6)
+
     # Training loop
     n_epochs = 200
     stale_epochs = 0
@@ -180,7 +188,7 @@ def main(args):
     for epoch in range(start_epoch, n_epochs):
         print('Epoch: {:02d}'.format(epoch))
 
-        if args.train_emd_adversarially:    # 
+        if args.train_emd_adversarially:
             emd_train_loss = train_emd_model(model, emd_model, emd_optimizer, train_loader, scaler, device)
             print('EMD-NN Training Loss: {:.4f}'.format(emd_train_loss))
 
@@ -201,16 +209,24 @@ def main(args):
         print('Validation Loss: {:.4f}'.format(valid_loss))
 
         if valid_loss < best_valid_loss:
+            stale_epochs = 0
             best_valid_loss = valid_loss
-            print('New best model saved to:',modpath)
+
+            print('New best model saved to:', modpath)
             if multi_gpu:
                 torch.save(model.module.state_dict(), modpath)
             else:
                 torch.save(model.state_dict(), modpath)
-            torch.save((train_losses, valid_losses, epoch+1), osp.join(save_dir,'losses.pt'))
-            if 'emd_loss' in loss_ftn_obj.name:
-                torch.save({'train_true_emd':train_true_emd, 'valid_true_emd':valid_true_emd}, osp.join(save_dir,'true_emds.pt'))
-            stale_epochs = 0
+
+            train_status = {
+                'train_losses': train_losses,
+                'valid_losses': valid_losses,
+                'epoch': epoch+1,
+                'lr': optimizer.param_groups[0]['lr'],
+                'train_true_emd': train_true_emd,
+                'valid_true_emd': valid_true_emd
+            }
+            torch.save(train_status, osp.join(save_dir, 'train_status.pt'))
         else:
             stale_epochs += 1
             print(f'Stale epoch: {stale_epochs}\nBest: {best_valid_loss}\nCurr: {valid_loss}')
