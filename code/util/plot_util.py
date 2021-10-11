@@ -265,7 +265,6 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
         fig, ax = plt.subplots(figsize =(9, 9))
         x_bins = np.linspace(0, max_range, 31)
         y_bins = np.linspace(0, max_range, 31)
-        print(len(true_emd))
         plt.hist2d(true_emd, pred_emd, bins=[x_bins, y_bins])
         ax.set_xlabel('True EMD')  
         ax.set_ylabel('Pred. EMD')
