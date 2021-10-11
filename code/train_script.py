@@ -246,6 +246,7 @@ def main(args):
     if args.plot_emd_corr:
         loss_ftn_obj = LossFunction('emd_loss', emd_model_name=args.emd_model_name, device=device)
         emd_loss_ftn = loss_ftn_obj.loss_ftn
+        plot_emd_corr(model, train_loader, emd_loss_ftn, save_dir, 'emd_corr_train', scaler, device)
         plot_emd_corr(model, valid_loader, emd_loss_ftn, save_dir, 'emd_corr_valid', scaler, device)
         plot_emd_corr(model, test_loader, emd_loss_ftn, save_dir, 'emd_corr_test', scaler, device)
     print('Completed')
