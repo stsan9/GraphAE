@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gae-data-gen-pyg2
+  labels:
+    jobgroup: anomaly-graph-job
+spec:
+  template:
+    spec:
+      priorityClassName: nice
+      containers:
+      - name: postprocessing
+        image: gitlab-registry.nrp-nautilus.io/jmduarte/anomalydetection4jets:latest
+        command:
+        - "python"
+        args:
+        - "/opt/repo/GraphAE/code/gen_gae_dataset.py"
+        - --dataset
+        - "/anomalyvol/data/bb0/"
+        - --n-proc
+        - "10"
+        - --bb
+        - "0"
+        - --n-events
+        - "-1"
+        - --n-events-merge
+        - "100000"
+        - --features
+        - 'relptetaphi'
+        volumeMounts:
+        - mountPath: /anomalyvol
+          name: anomalyvol-2
+        - name: git-repo
+          mountPath: /opt/repo
+        resources:
+          limits:
+            memory: 256Gi
+            cpu: "10"
+            #nvidia.com/gpu: "1"
+          requests:
+            memory: 256Gi
+            cpu: "10"
+            #nvidia.com/gpu: "1"    
+      initContainers:
+      - name: init-clone-repo
+        image: alpine/git
+        args:
+          - clone
+          - --single-branch
+          - https://github.com/ucsd-hep-ex/GraphAE
+          - -b
+          - main
+          - /opt/repo/GraphAE
+        volumeMounts:
+          - name: git-repo
+            mountPath: /opt/repo
+      volumes:
+      - name: git-repo
+        emptyDir: {}
+      - name: anomalyvol-2
+        persistentVolumeClaim:
+          claimName: anomalyvol-2
+      restartPolicy: Never
+  backoffLimit: 5
