@@ -1,5 +1,4 @@
 import glob
-import math
 import tqdm
 import torch
 import random
@@ -8,9 +7,8 @@ import os.path as osp
 import torch.nn as nn
 from pathlib import Path
 from itertools import chain
-from torch.utils.data import random_split
-from torch_geometric.data import Data, DataLoader, DataListLoader
-from torch_geometric.nn import EdgeConv, global_mean_pool, DataParallel
+from torch_geometric.data import DataLoader, DataListLoader
+from torch_geometric.nn import DataParallel
 
 import models.models as models
 import models.emd_models as emd_models
@@ -18,7 +16,7 @@ from util.loss_util import LossFunction
 from datagen.graph_data_gae import GraphDataset
 from util.train_util import get_model, forward_loss
 from util.preprocessing import get_iqr_proportions, standardize
-from util.plot_util import loss_curves, plot_reco_for_loader, plot_emd_corr
+from util.plot_util import loss_curves, plot_reco_for_loader, plot_emd_corr, adv_loss_curves
 from util.adversarial import train_emd_model
 
 torch.manual_seed(0)
@@ -34,7 +32,7 @@ def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None):
 
     for i,data in t:
 
-        batch_loss, batch_output = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
+        batch_loss, _ = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
         if 'emd_loss' in loss_ftn_obj.name:
             batch_loss, true_emd = batch_loss
 
@@ -47,7 +45,7 @@ def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None):
         return sum_loss / (i+1), true_emd
     return sum_loss / (i+1)
 
-def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None):
+def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None, emd_adv_train=False, emd_adv_patience=4):
     model.train()
 
     sum_loss = 0.
@@ -55,9 +53,19 @@ def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None
     for i,data in t:
         optimizer.zero_grad()
 
-        batch_loss, batch_output = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
+        emd_adv_stale_epochs = 0
+
+        batch_loss, _ = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
+
         if 'emd_loss' in loss_ftn_obj.name:
             batch_loss, true_emd = batch_loss
+            if emd_adv_train:   # early stop training if loss diverges too much from true emd
+                if (batch_loss - true_emd) / true_emd > 0.1:
+                    emd_adv_stale_epochs += 1
+                    if emd_adv_stale_epochs >= emd_adv_patience:
+                        i -= 1
+                        break
+
         batch_loss.backward()
         optimizer.step()
 
@@ -68,6 +76,7 @@ def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None
 
     if 'emd_loss' in loss_ftn_obj.name:
         return sum_loss / (i+1), true_emd
+
     return sum_loss / (i+1)
 
 def main(args):
@@ -140,9 +149,12 @@ def main(args):
     start_epoch = 0
     lr = args.lr
     modpath = osp.join(save_dir, model_fname+'.best.pth')
+    emdmodpath = osp.join(save_dir, 'emd_model.pt')
     if osp.isfile(modpath):
         model.load_state_dict(torch.load(modpath, map_location=device))
         model.to(device)
+        if osp.isfile(emdmodpath) and args.train_emd_adversarially:
+            emd_model.load_state_dict(torch.load(emdmodpath, map_location=device))
         best_valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
         if 'emd_loss' in loss_ftn_obj.name:
             best_valid_loss, ef_emd = best_valid_loss
@@ -178,36 +190,51 @@ def main(args):
         print("=" * 50)
         print('Epoch: {:02d}'.format(epoch))
 
+        # train EMD-NN on input x GAE reco
         if args.train_emd_adversarially:
-            # train EMD-NN on input x GAE reco
-            prev_emd_valid_loss = 9999999
+            best_emd_valid_loss = 9999999
+            emd_stale_epochs = 0
             while True:
                 emd_train_loss = train_emd_model(model, emd_model, emd_optimizer, train_loader, scaler, device)
                 emd_valid_loss = train_emd_model(model, emd_model, None, train_loader, scaler, device)
-                if emd_valid_loss < prev_emd_valid_loss:    # early stop after 1 epoch
-                    prev_emd_valid_loss = emd_valid_loss
-                else:
-                    break
+                train_adv_loss.append(emd_train_loss)
+                valid_adv_loss.append(emd_valid_loss)
                 print('EMD-NN Training Loss: {:.4f}'.format(emd_train_loss))
                 print('EMD-NN Valid Loss: {:.4f}'.format(emd_valid_loss))
 
-        loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
+                if emd_valid_loss < best_emd_valid_loss:
+                    best_emd_valid_loss = emd_valid_loss
+                    emd_stale_epochs = 0
+                    torch.save(emd_model.state_dict(), emdmodpath)
+                else:
+                    emd_stale_epochs += 1
+                    if emd_stale_epochs >= args.emd_nn_patience:
+                        emd_model.load_state_dict(torch.load(emdmodpath, map_location=device))
+                        break
+
+        # train gae
+        loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, scaler=scaler, emd_adv_train=args.train_emd_adverarially)
         if 'emd_loss' in loss_ftn_obj.name:
             loss, ef_emd = loss
             train_true_emd.append(ef_emd)
-
+        # validate
         valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
         if 'emd_loss' in loss_ftn_obj.name:
             valid_loss, ef_emd = valid_loss
             valid_true_emd.append(ef_emd)
 
-        scheduler.step(valid_loss)
+        if args.train_emd_adversarially:
+            scheduler.step(ef_emd)
+        else:
+            scheduler.step(valid_loss)
         train_losses.append(loss)
         valid_losses.append(valid_loss)
         print('Training Loss: {:.4f}'.format(loss))
         print('Validation Loss: {:.4f}'.format(valid_loss))
 
-        if valid_loss < best_valid_loss or args.train_emd_adversarially:
+        if args.train_emd_adversarially:    # use true emd if training adv
+            valid_loss = abs(ef_emd - valid_loss)
+        if valid_loss < best_valid_loss:    # early stop check
             stale_epochs = 0
             best_valid_loss = valid_loss
 
@@ -237,6 +264,9 @@ def main(args):
     train_epochs = list(range(epoch+1))
     early_stop_epoch = epoch - stale_epochs
     loss_curves(train_epochs, early_stop_epoch, train_losses, valid_losses, save_dir, train_true_emd, valid_true_emd)
+    if args.train_emd_adversarially:
+        emd_train_epochs = list(range(train_adv_loss+1))
+        adv_loss_curves(emd_train_epochs, train_adv_loss, valid_adv_loss, save_dir)
 
     # load best model
     del model
@@ -276,6 +306,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, help='batch size', default=2, required=False)
     parser.add_argument('--lr', type=float, help='learning rate', default=1e-3, required=False)
     parser.add_argument('--patience', type=int, help='patience', default=10, required=False)
+    parser.add_argument('--emd-nn-patience', type=int, help='patience for emd adv training', default=5, required=False)
     parser.add_argument('--epochs', type=int, help='max number of epochs', default=200, required=False)
     parser.add_argument('--loss', choices=[m for m in dir(LossFunction) if not m.startswith('__')], 
                         help='loss function', required=True)

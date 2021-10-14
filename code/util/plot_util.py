@@ -115,9 +115,6 @@ def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, tra
         plt.xlabel("Epochs")
         plt.ylabel("Loss")
         plt.legend(['Train', 'Validation', 'Best model'])
-        plt.savefig(osp.join(save_path, 'loss_curves.pdf'))
-        plt.savefig(osp.join(save_path, 'loss_curves.png'))
-        plt.close()
     else:
         plt.plot(epochs, train_loss, label='Pred EMD (Train)')
         plt.plot(epochs, valid_loss, label='Pred EMD (Valid)')
@@ -135,10 +132,29 @@ def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, tra
         plt.xlabel("Epochs")
         plt.ylabel("EMD-NN Loss")
         plt.legend()
-        plt.savefig(osp.join(save_path, 'loss_curves.pdf'))
-        plt.savefig(osp.join(save_path, 'loss_curves.png'))
-        plt.close()
+    plt.savefig(osp.join(save_path, 'loss_curves.pdf'))
+    plt.savefig(osp.join(save_path, 'loss_curves.png'))
+    plt.close()
 
+def adv_loss_curves(epochs, train_loss, valid_loss, save_path):
+    '''
+        Graph our training and validation losses.
+    '''
+    plt.plot(epochs, train_loss, valid_loss)
+    plt.xticks(epochs)
+    ax = plt.gca()
+    ax.set_yscale('log')
+    if max(epochs) < 60:
+        ax.locator_params(nbins=10, axis='x')
+    else:
+        ax.set_xticks(np.arange(0, max(epochs), 20))
+    plt.title("EMD Model Adversarial Training Loss Curves")
+    plt.xlabel("Epochs")
+    plt.ylabel("MSE Loss")
+    plt.legend(['Train', 'Validation'])
+    plt.savefig(osp.join(save_path, 'emd_adv_loss_curves.pdf'))
+    plt.savefig(osp.join(save_path, 'emd_adv_loss_curves.png'))
+    plt.close()
 
 def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch):
     """
