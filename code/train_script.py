@@ -213,7 +213,7 @@ def main(args):
                         break
 
         # train gae
-        loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, scaler=scaler, emd_adv_train=args.train_emd_adverarially)
+        loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, scaler=scaler, emd_adv_train=args.train_emd_adversarially)
         if 'emd_loss' in loss_ftn_obj.name:
             loss, ef_emd = loss
             train_true_emd.append(ef_emd)
