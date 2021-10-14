@@ -267,7 +267,7 @@ def main(args):
     early_stop_epoch = epoch - stale_epochs
     loss_curves(train_epochs, early_stop_epoch, train_losses, valid_losses, save_dir, train_true_emd, valid_true_emd)
     if args.train_emd_adversarially:
-        emd_train_epochs = list(range(len(train_adv_loss)+1))
+        emd_train_epochs = list(range(len(train_adv_loss)))
         adv_loss_curves(emd_train_epochs, train_adv_loss, valid_adv_loss, save_dir)
 
     # load best model
