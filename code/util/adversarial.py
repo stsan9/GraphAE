@@ -77,7 +77,10 @@ def train_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, device=
 
         loss = loss.item()
         sum_loss += loss
-        t.set_description('EMD-NN train loss = %.7f' % loss)
+        if emd_optimizer == None:
+            t.set_description('EMD-NN valid loss = %.7f' % loss)
+        else:
+            t.set_description('EMD-NN train loss = %.7f' % loss)
         t.refresh() # to show immediately the update
 
     # return average loss of emd network during training
