@@ -235,7 +235,7 @@ def main(args):
         print('Validation Loss: {:.4f}'.format(valid_loss))
 
         if args.train_emd_adversarially:    # use true emd if training adv
-            valid_loss = abs(ef_emd - valid_loss)
+            valid_loss = ef_emd
         if valid_loss < best_valid_loss:    # early stop check
             stale_epochs = 0
             best_valid_loss = valid_loss
