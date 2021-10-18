@@ -159,7 +159,7 @@ def main(args):
         if 'emd_loss' in loss_ftn_obj.name:
             best_valid_loss, ef_emd = best_valid_loss
             if args.train_emd_adversarially:
-                best_valid_loss = abs(best_valid_loss - ef_emd)
+                best_valid_loss = ef_emd
         print(f'Loaded Model\nSaved model valid loss: {best_valid_loss}')
 
         if not args.drop_old_losses:    # use when swapping from pretrained network to new training w/ different loss
