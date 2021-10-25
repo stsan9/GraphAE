@@ -256,7 +256,7 @@ def main(args):
 
         train_losses.append(train_loss)
         valid_losses.append(valid_loss)
-        print('Training Loss: {:.4f}'.format(loss))
+        print('Training Loss: {:.4f}'.format(train_loss))
         print('Validation Loss: {:.4f}'.format(valid_loss))
 
         if args.train_emd_adversarially:    # use true emd if training adv
