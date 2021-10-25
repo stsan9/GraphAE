@@ -172,6 +172,8 @@ def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch):
 
     true_emd = []
     for x, y in zip(in_parts, gen_parts):
+        x = x.reshape(-1)
+        y = y.reshape(-1)
         emd = ef.emd.emd(x, y, n_iter_max=500000, return_flow=False, norm=True)
         true_emd.append(emd)
     true_emd = np.array(true_emd)
