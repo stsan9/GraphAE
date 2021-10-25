@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from itertools import chain
 from util.loss_util import preprocess_emdnn_input
 
-def train_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, device=torch.device('cuda:0')):
+def loop_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, device=torch.device('cuda:0')):
     """
     Train emd model on (input, gae_reco) for one epoch. Can use for validation if emd_optimizer is None.
 

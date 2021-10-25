@@ -16,23 +16,28 @@ from util.loss_util import LossFunction
 from datagen.graph_data_gae import GraphDataset
 from util.train_util import get_model, forward_loss
 from util.preprocessing import get_iqr_proportions, standardize
-from util.plot_util import loss_curves, plot_reco_for_loader, plot_emd_corr, adv_loss_curves
-from util.adversarial import train_emd_model
+from util.plot_util import loss_curves, plot_reco_for_loader, plot_emd_corr, adv_loss_curves, epoch_emd_corr
+from util.adversarial import loop_emd_model
 
 torch.manual_seed(0)
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 multi_gpu = torch.cuda.device_count()>1
 
 @torch.no_grad()
-def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None):
+def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None, gen_emd_corr=False):
     model.eval()
 
     sum_loss = 0.
     t = tqdm.tqdm(enumerate(loader),total=total/batch_size)
+    if gen_emd_corr:
+        in_parts = []
+        gen_parts = []
+        pred_emd = []
+
 
     for i,data in t:
 
-        batch_loss, _ = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
+        batch_loss, batch_output = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
         if 'emd_loss' in loss_ftn_obj.name:
             batch_loss, true_emd = batch_loss
 
@@ -41,9 +46,17 @@ def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None):
         t.set_description('eval loss = %.7f' % (batch_loss))
         t.refresh() # to show immediately the update
 
+        if gen_emd_corr:
+            in_parts.append(data.x.detach().cpu().numpy())
+            gen_parts.append(batch_output.detach().cpu().numpy())
+            pred_emd.append(batch_loss)
+
+    avg_loss = sum_loss / (i+1)
     if 'emd_loss' in loss_ftn_obj.name:
-        return sum_loss / (i+1), true_emd
-    return sum_loss / (i+1)
+        return avg_loss, true_emd
+    if gen_emd_corr:
+        return avg_loss, true_emd, in_parts, gen_parts, pred_emd
+    return avg_loss
 
 def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None, emd_adv_train=False, emd_adv_patience=4):
     model.train()
@@ -74,10 +87,11 @@ def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None
         t.set_description('train loss = %.7f' % batch_loss)
         t.refresh() # to show immediately the update
 
+    avg_loss = sum_loss / (i+1)
     if 'emd_loss' in loss_ftn_obj.name:
-        return sum_loss / (i+1), true_emd
+        return avg_loss, true_emd
 
-    return sum_loss / (i+1)
+    return avg_loss
 
 def main(args):
     model_fname = args.mod_name
@@ -139,7 +153,6 @@ def main(args):
     hidden_dim = args.lat_dim
     model = get_model(args.model, input_dim=input_dim, big_dim=big_dim, hidden_dim=hidden_dim, emd_modname=args.emd_model_name)
 
-    # load model and previous training state
     valid_losses = []
     train_losses = []
     train_true_emd = [] if 'emd_loss' in loss_ftn_obj.name else None    # energyflow emd with gae reco for train epochs
@@ -148,13 +161,19 @@ def main(args):
     valid_adv_loss = [] if args.train_emd_adversarially else None
     start_epoch = 0
     lr = args.lr
+    best_valid_loss = 9999999   # default valid loss
     modpath = osp.join(save_dir, model_fname+'.best.pth')
     emdmodpath = osp.join(save_dir, 'emd_model.pt')
+
+    # load model and previous training state
     if osp.isfile(modpath):
         model.load_state_dict(torch.load(modpath, map_location=device))
         model.to(device)
-        if osp.isfile(emdmodpath) and args.train_emd_adversarially:
+
+        if osp.isfile(emdmodpath) and args.train_emd_adversarially: # load emd-nn
             emd_model.load_state_dict(torch.load(emdmodpath, map_location=device))
+
+        # calculate best validation loss
         best_valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
         if 'emd_loss' in loss_ftn_obj.name:
             best_valid_loss, ef_emd = best_valid_loss
@@ -162,7 +181,7 @@ def main(args):
                 best_valid_loss = ef_emd
         print(f'Loaded Model\nSaved model valid loss: {best_valid_loss}')
 
-        if not args.drop_old_losses:    # use when swapping from pretrained network to new training w/ different loss
+        if not args.drop_old_losses:    # load previous train info (losses, etc.)
             if osp.isfile(osp.join(save_dir, 'train_status.pt')):
                 train_status = torch.load(osp.join(save_dir, 'train_status.pt'))
                 train_losses = train_status['train_losses']
@@ -171,11 +190,8 @@ def main(args):
                 lr = train_status['lr']
                 train_true_emd = train_status['train_true_emd']
                 valid_true_emd = train_status['valid_true_emd']
-        else:
-            best_valid_loss = 9999999
     else:
         print('Creating new model')
-        best_valid_loss = 9999999
         model.to(device)
     if multi_gpu:
         model = DataParallel(model)
@@ -187,18 +203,18 @@ def main(args):
     # Training loop
     n_epochs = args.epochs
     stale_epochs = 0
-    loss = best_valid_loss
+
     for epoch in range(start_epoch, n_epochs):
         print("=" * 50)
         print('Epoch: {:02d}'.format(epoch))
 
-        # train EMD-NN on input x GAE reco
+        # Adv EMD-NN train loop
         if args.train_emd_adversarially:
             best_emd_valid_loss = 9999999
             emd_stale_epochs = 0
             while True:
-                emd_train_loss = train_emd_model(model, emd_model, emd_optimizer, train_loader, scaler, device)
-                emd_valid_loss = train_emd_model(model, emd_model, None, train_loader, scaler, device)
+                emd_train_loss = loop_emd_model(model, emd_model, emd_optimizer, train_loader, scaler, device)
+                emd_valid_loss = loop_emd_model(model, emd_model, None, train_loader, scaler, device)
                 train_adv_loss.append(emd_train_loss)
                 valid_adv_loss.append(emd_valid_loss)
                 print('EMD-NN Training Loss: {:.4f}'.format(emd_train_loss))
@@ -212,30 +228,40 @@ def main(args):
                     emd_stale_epochs += 1
                     if emd_stale_epochs >= args.emd_nn_patience:
                         emd_model.load_state_dict(torch.load(emdmodpath, map_location=device))
+                        if args.plot_emd_corr_epoch != 0 and epoch % args.plot_emd_corr_epoch == 0:
+                            emd_loss_ftn = loss_ftn_obj.loss_ftn
+                            plot_emd_corr(model, valid_loader, emd_loss_ftn, save_dir, 'emd_corr_valid_{epoch}', scaler, device, sub_dir='post_emd_loop_corr')
                         break
 
-        # train gae
+        # train GAE
         loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, scaler=scaler, emd_adv_train=args.train_emd_adversarially)
         if 'emd_loss' in loss_ftn_obj.name:
-            loss, ef_emd = loss
+            train_loss, ef_emd = loss
             train_true_emd.append(ef_emd)
-        # validate
-        valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
-        if 'emd_loss' in loss_ftn_obj.name:
-            valid_loss, ef_emd = valid_loss
-            valid_true_emd.append(ef_emd)
 
-        if args.train_emd_adversarially:
-            scheduler.step(ef_emd)
+        # validate GAE
+        if args.plot_emd_corr_epoch != 0 and epoch % args.plot_emd_corr_epoch == 0:
+            # make emd corr plot for epoch
+            valid_loss, ef_emd, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler, gen_emd_corr=True)
+            valid_true_emd.append(ef_emd)
+            sub_dir = "valid_gae_emd_corr"
+            epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch)
         else:
-            scheduler.step(valid_loss)
-        train_losses.append(loss)
+            valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
+            if 'emd_loss' in loss_ftn_obj.name:
+                valid_loss, ef_emd = valid_loss
+                valid_true_emd.append(ef_emd)
+
+        train_losses.append(train_loss)
         valid_losses.append(valid_loss)
         print('Training Loss: {:.4f}'.format(loss))
         print('Validation Loss: {:.4f}'.format(valid_loss))
 
         if args.train_emd_adversarially:    # use true emd if training adv
             valid_loss = ef_emd
+
+        scheduler.step(valid_loss)
+
         if valid_loss < best_valid_loss:    # early stop check
             stale_epochs = 0
             best_valid_loss = valid_loss
@@ -286,7 +312,8 @@ def main(args):
     
     # plot emd correlation plots between emd-nn and true emd values between gae input and output
     if args.plot_emd_corr:
-        loss_ftn_obj = LossFunction('emd_loss', emd_model_name=args.emd_model_name, device=device)
+        if 'emd_loss' not in loss_ftn_obj.name:
+            loss_ftn_obj = LossFunction('emd_loss', emd_model_name=args.emd_model_name, device=device)
         emd_loss_ftn = loss_ftn_obj.loss_ftn
         plot_emd_corr(model, train_loader, emd_loss_ftn, save_dir, 'emd_corr_train', scaler, device)
         plot_emd_corr(model, valid_loader, emd_loss_ftn, save_dir, 'emd_corr_valid', scaler, device)
@@ -320,6 +347,7 @@ if __name__ == '__main__':
                         default=0, required=False)
     parser.add_argument("--standardize", action="store_true", help="normalize dataset", required=False)
     parser.add_argument("--plot-emd-corr", action="store_true", help="plot emd correlation plot at end of training", required=False)
+    parser.add_argument("--plot-emd-corr-epoch", type=int, help="EMD Corr every n epochs (0 for no plots)", default=0, required=False)
     parser.add_argument("--train-emd-adversarially", action="store_true", help="train emd-nn loss function with (input, gae reco)", required=False)
     parser.add_argument("--drop-old-losses", action="store_true", help="don't load in old loss values", required=False)
     parser.add_argument("--plot-scale", choices=['cartesian','hadronic','standardized'],

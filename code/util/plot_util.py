@@ -156,7 +156,7 @@ def adv_loss_curves(epochs, train_loss, valid_loss, save_path):
     plt.savefig(osp.join(save_path, 'emd_adv_loss_curves.png'))
     plt.close()
 
-def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch):
+def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch):
     """
     Plot emd correlation plot at this epoch
 
@@ -167,7 +167,7 @@ def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, epoch):
     :param epoch: epoch correlation plot is made for
     """
 
-    save_dir = osp.join(save_dir, 'emd_corr_plots')
+    save_dir = osp.join(save_dir, sub_dir)
     Path(save_dir).mkdir(exist_ok=True)
 
     true_emd = []
@@ -250,7 +250,7 @@ def reco_relative_diff(jet_in, jet_out, save_dir, save_name):
     plt.close()
 
 @torch.no_grad()
-def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, device):
+def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, device, sub_dir=None):
     """
     :param model: GAE
     :param loader: torch dataloader
@@ -260,6 +260,10 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
     :param scaler: prefitted Standardizer
     :param device: torch device cpu/gpu
     """
+    if sub_dir != None:
+        save_dir = osp.join(save_dir, sub_dir)
+        Path(save_dir).mkdir(exist_ok=True)
+
     def make_plots(true_emd, pred_emd):
         """
         :param true_emd: np array
