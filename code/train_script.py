@@ -54,10 +54,10 @@ def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None, gen_emd_co
             pred_emd.append(batch_loss)
 
     avg_loss = sum_loss / (i+1)
-    if 'emd_loss' in loss_ftn_obj.name:
-        return avg_loss, true_emd
     if gen_emd_corr:
         return avg_loss, true_emd, in_parts, gen_parts, pred_emd
+    elif 'emd_loss' in loss_ftn_obj.name:
+        return avg_loss, true_emd
     return avg_loss
 
 def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None, emd_adv_train=False, emd_adv_patience=4):
