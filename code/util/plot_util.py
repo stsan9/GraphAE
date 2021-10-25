@@ -21,7 +21,7 @@ def loss_distr(losses, save_name):
     plt.savefig(osp.join(save_name+'.pdf'))
     plt.close()
 
-def plot_reco_difference(input_fts, reco_fts, model_fname, save_path, feature='hadronic'):
+def plot_reco_difference(input_fts, reco_fts, save_path, feature='hadronic'):
     """
     Plot the difference between the autoencoder's reconstruction and the original input
 
@@ -89,12 +89,12 @@ def gen_in_out(model, loader, device):
     reco_fts = torch.cat(reco_fts)
     return input_fts, reco_fts
 
-def plot_reco_for_loader(model, loader, device, scaler, inverse_scale, model_fname, save_dir, feature_format):
+def plot_reco_for_loader(model, loader, device, scaler, inverse_scale, save_dir, feature_format):
     input_fts, reco_fts = gen_in_out(model, loader, device)
     if inverse_scale:
         input_fts = scaler.inverse_transform(input_fts)
         reco_fts = scaler.inverse_transform(reco_fts)
-    plot_reco_difference(input_fts, reco_fts, model_fname, save_dir, feature_format)
+    plot_reco_difference(input_fts, reco_fts, save_dir, feature_format)
 
 
 def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, train_true_emd=None, valid_true_emd=None):
