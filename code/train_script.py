@@ -232,7 +232,7 @@ def main(args):
                         emd_model.load_state_dict(torch.load(emdmodpath, map_location=device))
                         if args.plot_emd_corr_epoch != 0 and epoch % args.plot_emd_corr_epoch == 0:
                             emd_loss_ftn = loss_ftn_obj.loss_ftn
-                            plot_emd_corr(model, valid_loader, emd_loss_ftn, save_dir, 'emd_corr_valid_{epoch}', scaler, device, sub_dir='post_emd_loop_corr')
+                            plot_emd_corr(model, valid_loader, emd_loss_ftn, save_dir, f'emd_corr_valid_{epoch}', scaler, device, sub_dir='post_emd_loop_corr')
                         break
 
         # train GAE

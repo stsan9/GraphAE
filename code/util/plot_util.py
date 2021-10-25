@@ -186,7 +186,7 @@ def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch):
     plt.rcParams['figure.dpi'] = 120
     plt.rcParams['font.family'] = 'serif'
 
-    max_range = 0.8
+    max_range = max(np.max(true_emd), np.max(pred_emd))
 
     fig, ax = plt.subplots(figsize =(5, 5)) 
     plt.hist(true_emd, bins=np.linspace(0, max_range, 101), label='True', alpha=0.5)
