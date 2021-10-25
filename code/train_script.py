@@ -3,8 +3,8 @@ import tqdm
 import torch
 import random
 import inspect
+import numpy as np
 import os.path as osp
-import torch.nn as nn
 from pathlib import Path
 from itertools import chain
 from torch_geometric.data import DataLoader, DataListLoader
@@ -48,7 +48,9 @@ def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None, gen_emd_co
 
         if gen_emd_corr:
             in_parts.append(data.x.detach().cpu().numpy())
-            gen_parts.append(batch_output.detach().cpu().numpy())
+            if not isinstance(batch_output, np.ndarray):
+                batch_output = batch_output.detach().cpu().numpy()
+            gen_parts.append(batch_output)
             pred_emd.append(batch_loss)
 
     avg_loss = sum_loss / (i+1)
