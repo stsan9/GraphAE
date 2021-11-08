@@ -178,32 +178,34 @@ def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch):
         true_emd.append(emd)
     true_emd = np.array(true_emd)
     pred_emd = np.array(pred_emd)
-    np.save(osp.join(save_dir, f'true_emd_{epoch}'), true_emd)
-    np.save(osp.join(save_dir, f'pred_emd_{epoch}'), pred_emd)
 
     # plot figures
-    plt.rcParams['figure.figsize'] = (4,4)
-    plt.rcParams['figure.dpi'] = 120
-    plt.rcParams['font.family'] = 'serif'
+    rc_settings = {
+        'figure.figsize': (4,4),
+        'figure.dpi': 120,
+        'font.family': 'serif'
+    }
+    with plt.rc_context(rc_settings):
+        max_range = max(np.max(true_emd), np.max(pred_emd))
 
-    max_range = max(np.max(true_emd), np.max(pred_emd))
+        fig, ax = plt.subplots(figsize =(5, 5)) 
+        plt.hist(true_emd, bins=np.linspace(0, max_range, 101), label='True', alpha=0.5)
+        plt.hist(pred_emd, bins=np.linspace(0, max_range, 101), label = 'Pred.', alpha=0.5)
+        plt.legend()
+        ax.set_xlabel('EMD [GeV]') 
+        fig.savefig(osp.join(save_dir,f'EMD_ep_{epoch}.pdf'))
+        fig.savefig(osp.join(save_dir,f'EMD_ep_{epoch}.png'))
+        plt.close()
 
-    fig, ax = plt.subplots(figsize =(5, 5)) 
-    plt.hist(true_emd, bins=np.linspace(0, max_range, 101), label='True', alpha=0.5)
-    plt.hist(pred_emd, bins=np.linspace(0, max_range, 101), label = 'Pred.', alpha=0.5)
-    plt.legend()
-    ax.set_xlabel('EMD [GeV]') 
-    fig.savefig(osp.join(save_dir,f'EMD_ep_{epoch}.pdf'))
-    fig.savefig(osp.join(save_dir,f'EMD_ep_{epoch}.png'))
-
-    fig, ax = plt.subplots(figsize =(5, 5)) 
-    x_bins = np.linspace(0, max_range, 101)
-    y_bins = np.linspace(0, max_range, 101)
-    plt.hist2d(true_emd, pred_emd, bins=[x_bins,y_bins])
-    ax.set_xlabel('True EMD [GeV]')  
-    ax.set_ylabel('Pred. EMD [GeV]')
-    fig.savefig(osp.join(save_dir,f'EMD_corr_ep_{epoch}.pdf'))
-    fig.savefig(osp.join(save_dir,f'EMD_corr_ep_{epoch}.png'))
+        fig, ax = plt.subplots(figsize =(5, 5)) 
+        x_bins = np.linspace(0, max_range, 101)
+        y_bins = np.linspace(0, max_range, 101)
+        plt.hist2d(true_emd, pred_emd, bins=[x_bins,y_bins])
+        ax.set_xlabel('True EMD [GeV]')  
+        ax.set_ylabel('Pred. EMD [GeV]')
+        fig.savefig(osp.join(save_dir,f'EMD_corr_ep_{epoch}.pdf'))
+        fig.savefig(osp.join(save_dir,f'EMD_corr_ep_{epoch}.png'))
+        plt.close()
 
 def plot_jet_images(jet, save_dir, save_name):
     """
