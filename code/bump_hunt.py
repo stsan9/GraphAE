@@ -6,11 +6,9 @@ python bump_hunt.py --model-name EdgeNet_emd_1k --model EdgeNet --loss emd_loss 
 """
 import sys
 import tqdm
-import math
 import torch
 import random
 import inspect
-import awkward0
 import numpy as np
 import pandas as pd
 import mplhep as hep
