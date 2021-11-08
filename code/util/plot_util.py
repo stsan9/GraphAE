@@ -181,7 +181,7 @@ def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch):
 
     # plot figures
     rc_settings = {
-        'figure.figsize': (4,4),
+        'figure.figsize': (5,5),
         'figure.dpi': 120,
         'font.family': 'serif'
     }
@@ -217,6 +217,10 @@ def plot_jet_images(jet, save_dir, save_name):
     plt.imshow(ef.utils.pixelate(jet))
     plt.savefig(osp.join(save_dir, save_name))
     plt.close()
+
+def gen_jet_images(model, loader, save_dir, save_name, n_images=10):
+    with torch.no_grad():
+        pass    # TODO: get sample of n_images and plot them 
 
 def reco_relative_diff(jet_in, jet_out, save_dir, save_name):
     """
