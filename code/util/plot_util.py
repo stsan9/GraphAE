@@ -278,10 +278,6 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
         :param pred_emd: np array
         """
         # plot figures
-        plt.rcParams['figure.figsize'] = (4,4)
-        plt.rcParams['figure.dpi'] = 120
-        plt.rcParams['font.family'] = 'serif'
-        # plot figures
         rc_settings = {
             'figure.figsize': (4,4),
             'figure.dpi': 120,
