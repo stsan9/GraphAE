@@ -101,7 +101,7 @@ def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, tra
     '''
         Graph our training and validation losses.
     '''
-    plt.figure(figsize=(8,7))
+    plt.figure(figsize=(10,9.5))
     if train_true_emd is None or valid_true_emd is None:
         plt.plot(epochs, train_loss, valid_loss)
         plt.xticks(epochs)
@@ -141,7 +141,7 @@ def adv_loss_curves(epochs, train_loss, valid_loss, save_path):
     '''
         Graph our training and validation losses.
     '''
-    plt.figure(figsize=(8,7))
+    plt.figure(figsize=(10,9.5))
     plt.plot(epochs, train_loss, valid_loss)
     plt.xticks(epochs)
     ax = plt.gca()
@@ -284,7 +284,7 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
         :param pred_emd: np array
         """
         # plot figures
-        plt.figure(figsize=(8,7))
+        plt.figure(figsize=(10,9.5))
         rc_settings = {
             'figure.figsize': (4,4),
             'figure.dpi': 120,
