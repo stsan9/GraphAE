@@ -19,6 +19,7 @@ def loss_distr(losses, save_name):
     plt.xlabel('Loss', fontsize=16)
     plt.ylabel('Jets', fontsize=16)
     plt.savefig(osp.join(save_name+'.pdf'))
+    plt.clf()
     plt.close()
 
 def plot_reco_difference(input_fts, reco_fts, save_path, feature='hadronic'):
@@ -64,6 +65,7 @@ def plot_reco_difference(input_fts, reco_fts, save_path, feature='hadronic'):
         plt.ylabel('Particles', fontsize='x-large')
         plt.tight_layout()
         plt.savefig(osp.join(save_path, feat[i] + '.pdf'))
+        plt.clf()
         plt.close()
 
 @torch.no_grad()
@@ -134,6 +136,7 @@ def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, tra
         plt.legend()
     plt.savefig(osp.join(save_path, 'loss_curves.pdf'))
     plt.savefig(osp.join(save_path, 'loss_curves.png'))
+    plt.clf()
     plt.close()
 
 def adv_loss_curves(epochs, train_loss, valid_loss, save_path):
@@ -154,6 +157,7 @@ def adv_loss_curves(epochs, train_loss, valid_loss, save_path):
     plt.legend(['Train', 'Validation'])
     plt.savefig(osp.join(save_path, 'emd_adv_loss_curves.pdf'))
     plt.savefig(osp.join(save_path, 'emd_adv_loss_curves.png'))
+    plt.clf()
     plt.close()
 
 def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch):
@@ -195,6 +199,7 @@ def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch):
         ax.set_xlabel('EMD [GeV]') 
         fig.savefig(osp.join(save_dir,f'EMD_ep_{epoch}.pdf'))
         fig.savefig(osp.join(save_dir,f'EMD_ep_{epoch}.png'))
+        plt.clf()
         plt.close()
 
         fig, ax = plt.subplots(figsize =(5, 5)) 
@@ -205,6 +210,7 @@ def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch):
         ax.set_ylabel('Pred. EMD [GeV]')
         fig.savefig(osp.join(save_dir,f'EMD_corr_ep_{epoch}.pdf'))
         fig.savefig(osp.join(save_dir,f'EMD_corr_ep_{epoch}.png'))
+        plt.clf()
         plt.close()
 
 def plot_jet_images(jet, save_dir, save_name):
@@ -216,6 +222,7 @@ def plot_jet_images(jet, save_dir, save_name):
 
     plt.imshow(ef.utils.pixelate(jet))
     plt.savefig(osp.join(save_dir, save_name))
+    plt.clf()
     plt.close()
 
 def gen_jet_images(model, loader, save_dir, save_name, n_images=10):
@@ -255,6 +262,7 @@ def reco_relative_diff(jet_in, jet_out, save_dir, save_name):
     feat = 'phi'
     plt.title(feat)
     plt.savefig(osp.join(save_dir, save_name + '_' + feat))
+    plt.clf()
     plt.close()
 
 @torch.no_grad()
@@ -297,6 +305,7 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
         ax.set_xlabel('True EMD')  
         ax.set_ylabel('Pred. EMD')
         plt.savefig(osp.join(save_dir, save_name))
+        plt.clf()
         plt.close()
 
     pred_emd = []
