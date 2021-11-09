@@ -161,6 +161,10 @@ def main(args):
     valid_true_emd = [] if 'emd_loss' in loss_ftn_obj.name else None
     train_adv_loss = [] if args.train_emd_adversarially else None
     valid_adv_loss = [] if args.train_emd_adversarially else None
+    train_emd_pred = [] if args.train_emd_adversarially else None
+    valid_emd_pred = [] if args.train_emd_adversarially else None
+    train_emd_true = [] if args.train_emd_adversarially else None
+    valid_emd_true = [] if args.train_emd_adversarially else None
     start_epoch = 0
     lr = args.lr
     best_valid_loss = 9999999   # default valid loss
@@ -215,10 +219,14 @@ def main(args):
             best_emd_valid_loss = 9999999
             emd_stale_epochs = 0
             while True:
-                emd_train_loss = loop_emd_model(model, emd_model, emd_optimizer, train_loader, scaler, device)
-                emd_valid_loss = loop_emd_model(model, emd_model, None, train_loader, scaler, device)
+                emd_train_loss, emd_pred_avg_train, emd_true_avg_train = loop_emd_model(model, emd_model, emd_optimizer, train_loader, scaler, device)
+                emd_valid_loss, emd_pred_avg_valid, emd_true_avg_valid = loop_emd_model(model, emd_model, None, train_loader, scaler, device)
                 train_adv_loss.append(emd_train_loss)
                 valid_adv_loss.append(emd_valid_loss)
+                train_emd_pred.append(emd_pred_avg_train)
+                valid_emd_pred.append(emd_pred_avg_valid)
+                train_emd_true.append(emd_true_avg_train)
+                valid_emd_true.append(emd_true_avg_valid)
                 print('EMD-NN Training Loss: {:.4f}'.format(emd_train_loss))
                 print('EMD-NN Valid Loss: {:.4f}'.format(emd_valid_loss))
 
@@ -242,17 +250,17 @@ def main(args):
             train_true_emd.append(ef_emd)
 
         # validate GAE
-        if args.plot_emd_corr_epoch != 0 and epoch % args.plot_emd_corr_epoch == 0:
-            # make emd corr plot for epoch
-            valid_loss, ef_emd, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler, gen_emd_corr=True)
+        # if args.plot_emd_corr_epoch != 0 and epoch % args.plot_emd_corr_epoch == 0:
+        #     # make emd corr plot for epoch
+        #     valid_loss, ef_emd, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler, gen_emd_corr=True)
+        #     valid_true_emd.append(ef_emd)
+        #     sub_dir = "valid_gae_emd_corr"
+        #     epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch)
+        # else:
+        valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
+        if 'emd_loss' in loss_ftn_obj.name:
+            valid_loss, ef_emd = valid_loss
             valid_true_emd.append(ef_emd)
-            sub_dir = "valid_gae_emd_corr"
-            epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch)
-        else:
-            valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
-            if 'emd_loss' in loss_ftn_obj.name:
-                valid_loss, ef_emd = valid_loss
-                valid_true_emd.append(ef_emd)
 
         train_losses.append(train_loss)
         valid_losses.append(valid_loss)
