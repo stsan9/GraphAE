@@ -31,6 +31,8 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, device=t
         return emd
 
     sum_loss = 0
+    sum_emd_pred = 0
+    sum_true_emd = 0
 
     t = tqdm(loader)
     for b in t:
@@ -77,6 +79,8 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, device=t
 
         loss = loss.item()
         sum_loss += loss
+        sum_emd_pred += emd_preds.mean().detach().cpu().numpy()
+        sum_true_emd += emd_targets.mean().detach().cpu().numpy()
         if emd_optimizer == None:
             t.set_description('EMD-NN valid loss = %.7f' % loss)
         else:
@@ -84,4 +88,6 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, loader, scaler, device=t
         t.refresh() # to show immediately the update
 
     # return average loss of emd network during training
-    return sum_loss / len(loader)
+    avg_emd_pred = sum_emd_pred / len(loader)
+    avg_true_emd = sum_true_emd / len(loader)
+    return sum_loss / len(loader), avg_emd_pred, avg_true_emd
