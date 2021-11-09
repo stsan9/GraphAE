@@ -247,7 +247,7 @@ def main(args):
             valid_loss, ef_emd, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler, gen_emd_corr=True)
             valid_true_emd.append(ef_emd)
             sub_dir = "valid_gae_emd_corr"
-            # epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch)
+            epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch)
         else:
             valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
             if 'emd_loss' in loss_ftn_obj.name:
