@@ -101,6 +101,7 @@ def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, tra
     '''
         Graph our training and validation losses.
     '''
+    plt.figure(figsize=(8,7))
     if train_true_emd is None or valid_true_emd is None:
         plt.plot(epochs, train_loss, valid_loss)
         plt.xticks(epochs)
@@ -140,6 +141,7 @@ def adv_loss_curves(epochs, train_loss, valid_loss, save_path):
     '''
         Graph our training and validation losses.
     '''
+    plt.figure(figsize=(8,7))
     plt.plot(epochs, train_loss, valid_loss)
     plt.xticks(epochs)
     ax = plt.gca()
@@ -180,6 +182,7 @@ def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch):
     pred_emd = np.array(pred_emd)
 
     # plot figures
+    plt.figure(figsize=(5,5))
     rc_settings = {
         'figure.figsize': (5,5),
         'figure.dpi': 120,
@@ -239,18 +242,21 @@ def reco_relative_diff(jet_in, jet_out, save_dir, save_name):
 
     bins = np.linspace(-1,1, 30)
 
+    plt.figure(figsize=(4,5))
     plt.hist(rel_diff[:,0], bins=bins)
     feat = 'p_T'
     plt.title(feat)
     plt.savefig(osp.join(save_dir, save_name + '_' + feat))
     plt.close()
 
+    plt.figure(figsize=(4,5))
     plt.hist(rel_diff[:,1], bins=bins)
     feat = 'eta'
     plt.title(feat)
     plt.savefig(osp.join(save_dir, save_name + '_' + feat))
     plt.close()
 
+    plt.figure(figsize=(4,5))
     plt.hist(rel_diff[:,2], bins=bins)
     feat = 'phi'
     plt.title(feat)
@@ -278,6 +284,7 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
         :param pred_emd: np array
         """
         # plot figures
+        plt.figure(figsize=(8,7))
         rc_settings = {
             'figure.figsize': (4,4),
             'figure.dpi': 120,
@@ -290,7 +297,7 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
             plt.hist(pred_emd, bins=np.linspace(0, max_range, 31),label = 'Pred.', alpha=0.5)
             plt.legend()
             ax.set_xlabel('EMD') 
-            fig.savefig(osp.join(save_dir, save_name + '2'))
+            fig.savefig(osp.join(save_dir,'2hists_' + save_name))
 
             fig, ax = plt.subplots(figsize =(9, 9))
             x_bins = np.linspace(0, max_range, 31)
@@ -298,7 +305,7 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
             plt.hist2d(true_emd, pred_emd, bins=[x_bins, y_bins])
             ax.set_xlabel('True EMD')  
             ax.set_ylabel('Pred. EMD')
-            plt.savefig(osp.join(save_dir, save_name))
+            plt.savefig(osp.join(save_dir, 'corr_' + save_name))
             plt.close()
 
     pred_emd = []
