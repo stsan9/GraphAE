@@ -75,7 +75,7 @@ def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, scaler=None
         if 'emd_loss' in loss_ftn_obj.name:
             batch_loss, true_emd = batch_loss
             if emd_adv_train:   # early stop training if loss diverges too much from true emd
-                if (batch_loss - true_emd) / true_emd > 0.1:
+                if (batch_loss - true_emd) / true_emd > 0.25:
                     emd_adv_stale_epochs += 1
                     if emd_adv_stale_epochs >= emd_adv_patience:
                         i -= 1
@@ -302,6 +302,17 @@ def main(args):
         if stale_epochs >= args.patience:
             print('Early stopping after %i stale epochs'%args.patience)
             break
+
+    # save state when training ends for checking
+    train_status = {
+        'train_losses': train_losses,
+        'valid_losses': valid_losses,
+        'epoch': epoch+1,
+        'lr': optimizer.param_groups[0]['lr'],
+        'gae_train_true_emd': gae_train_true_emd,
+        'gae_valid_true_emd': gae_valid_true_emd
+    }
+    torch.save(train_status, osp.join(save_dir, 'debug.pt'))
 
     # model training done
     train_epochs = list(range(epoch+1))
