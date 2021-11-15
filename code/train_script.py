@@ -73,7 +73,7 @@ def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, emd_optimiz
             iterations = 0
             while True:
                 avg_pred_emd, _, avg_true_emd = loop_emd_model(model, loss_ftn_obj.emd_model, emd_optimizer, data, scaler, device)
-                if (avg_pred_emd - avg_true_emd) / avg_true_emd <= 0.1 or iterations > 20:  # stop when learned the batch or take too long
+                if (avg_pred_emd - avg_true_emd) / avg_true_emd <= 0.05 or iterations > 20:  # stop when learned the batch or take too long
                     break
                 iterations += 1
 # loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, device=torch.device('cuda:0'))
@@ -282,6 +282,7 @@ def main(args):
 
         if args.train_emd_adversarially:    # use true emd if training adv
             valid_loss = ef_emd
+            print('Validation EMD True: {:.4f}'.format(ef_emd))
 
         scheduler.step(valid_loss)
 
@@ -326,9 +327,9 @@ def main(args):
     train_epochs = list(range(epoch+1))
     early_stop_epoch = epoch - stale_epochs + 1
     loss_curves(train_epochs, early_stop_epoch, train_losses, valid_losses, save_dir, gae_train_true_emd, gae_valid_true_emd)
-    if args.train_emd_adversarially:
-        emd_train_epochs = list(range(len(train_adv_loss)))
-        adv_loss_curves(emd_train_epochs, train_adv_loss, valid_adv_loss, save_dir)
+    # if args.train_emd_adversarially:
+    #     emd_train_epochs = list(range(len(train_adv_loss)))
+    #     adv_loss_curves(emd_train_epochs, train_adv_loss, valid_adv_loss, save_dir)
 
     # load best model
     del model
