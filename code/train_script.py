@@ -72,12 +72,10 @@ def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, emd_optimiz
         if emd_adv_train:
             iterations = 0
             while True:
-                avg_pred_emd, _, avg_true_emd = loop_emd_model(model, loss_ftn_obj.emd_model, emd_optimizer, data, scaler, device)
+                _, avg_pred_emd, avg_true_emd = loop_emd_model(model, loss_ftn_obj.emd_model, emd_optimizer, data, scaler, device)
                 if (avg_pred_emd - avg_true_emd) / avg_true_emd <= 0.05 or iterations > 20:  # stop when learned the batch or take too long
                     break
                 iterations += 1
-# loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, device=torch.device('cuda:0'))
-# emd_train_loss, emd_pred_avg_train, emd_true_avg_train = loop_emd_model(model, emd_model, emd_optimizer, train_loader, scaler, device)
 
         batch_loss, _ = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
 
