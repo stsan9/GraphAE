@@ -177,6 +177,7 @@ def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch):
         x = x.reshape(-1)
         y = y.reshape(-1)
         y[y < 0] = 0    # ensure positive pt
+        x[x < 0] = 0    # ensure positive pt
         emd = ef.emd.emd(x, y, n_iter_max=1000000, return_flow=False, norm=True)
         true_emd.append(emd)
     true_emd = np.array(true_emd)
