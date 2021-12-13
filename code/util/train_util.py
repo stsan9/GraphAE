@@ -43,7 +43,7 @@ def forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler=None):
         y = to_dense_batch(x=y, batch=batch)[0].detach().cpu().numpy()
         true_emd = 0
         for j1, j2 in zip(batch_output, y):
-            emd_val = ef.emd.emd(j1, j2, n_iter_max=2000000)
+            emd_val = ef.emd.emd(j1, j2, n_iter_max=10000000)
             true_emd += emd_val
         true_emd /= len(y)
 
