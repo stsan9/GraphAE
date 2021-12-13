@@ -334,6 +334,8 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
     make_plots(true_emd, pred_emd)
 
 def plot_emd_training_one_batch(epochs, losses, emd_diffs, save_name, save_path):
+    Path(save_path).mkdir(exist_ok=True)
+
     plt.figure(figsize=(10,9.5))
     fig, ax1 = plt.subplots()
 
