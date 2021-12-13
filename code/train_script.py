@@ -24,7 +24,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 multi_gpu = torch.cuda.device_count()>1
 
 @torch.no_grad()
-def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None, gen_emd_corr=False):
+def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None, gen_emd_corr=False, emd_adv_train=False, emd_optimizer=None, emd_adv_patience=4, fig_save_path=None, emd_model_path=None):
     model.eval()
 
     sum_loss = 0.
@@ -34,8 +34,14 @@ def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None, gen_emd_co
         gen_parts = []
         pred_emd = []
 
-
     for i,data in t:
+
+        # overfit the emd network on this batch
+        if emd_adv_train:
+            max_iters = 20
+            batch_num = i
+            loss_ftn_obj.emd_model.load_state_dict(torch.load(emd_model_path, map_location=device))
+            _, _, _ = loop_emd_model(model, loss_ftn_obj.emd_model, emd_optimizer, data, scaler, max_iters, emd_adv_patience, batch_num, fig_save_path, device)
 
         batch_loss, batch_output = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
         if 'emd_loss' in loss_ftn_obj.name:
@@ -60,23 +66,22 @@ def test(model, loader, total, batch_size, loss_ftn_obj, scaler=None, gen_emd_co
         return avg_loss, true_emd
     return avg_loss
 
-def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, emd_optimizer, scaler=None, emd_adv_train=False, emd_adv_patience=4):
+def train(model, optimizer, loader, total, batch_size, loss_ftn_obj, emd_optimizer, scaler=None, emd_adv_train=False, emd_adv_patience=4, fig_save_path=None, emd_model_path=None):
     model.train()
 
     sum_loss = 0.
     t = tqdm.tqdm(enumerate(loader),total=total/batch_size)
-    for i,data in t:
+    for i, data in t:
         optimizer.zero_grad()
 
-        # emd_adv_stale_epochs = 0
+        # overfit the emd network on this batch
         if emd_adv_train:
-            iterations = 0
-            while True:
-                _, avg_pred_emd, avg_true_emd = loop_emd_model(model, loss_ftn_obj.emd_model, emd_optimizer, data, scaler, device)
-                if (avg_pred_emd - avg_true_emd) / avg_true_emd <= 0.05 or iterations > 20:  # stop when learned the batch or take too long
-                    break
-                iterations += 1
+            max_iters = 20
+            batch_num = i
+            loss_ftn_obj.emd_model.load_state_dict(torch.load(emd_model_path, map_location=device))
+            _, _, _ = loop_emd_model(model, loss_ftn_obj.emd_model, emd_optimizer, data, scaler, max_iters, emd_adv_patience, batch_num, fig_save_path, device)
 
+        # train the gae
         batch_loss, _ = forward_loss(model, data, loss_ftn_obj, device, multi_gpu, scaler)
 
         if 'emd_loss' in loss_ftn_obj.name:
@@ -256,19 +261,50 @@ def main(args):
         #                 break
 
         # train GAE
-        loss = train(model, optimizer, train_loader, train_samples, args.batch_size, loss_ftn_obj, emd_optimizer, scaler=scaler, emd_adv_train=args.train_emd_adversarially)
+        loss = train(model,
+                     optimizer,
+                     train_loader,
+                     train_samples,
+                     args.batch_size,
+                     loss_ftn_obj,
+                     emd_optimizer,
+                     scaler=scaler,
+                     emd_adv_train=args.train_emd_adversarially,
+                     fig_save_path=osp.join(save_dir,'emd_train_curves'),
+                     emd_model_path=emdmodpath)
         if 'emd_loss' in loss_ftn_obj.name:     # for emd_loss unpack emd target from emd pred
             train_loss, ef_emd = loss
             gae_train_true_emd.append(ef_emd)
 
         # validate GAE
         if args.plot_emd_corr_epoch != 0 and epoch % args.plot_emd_corr_epoch == 0:     # make emd corr plot at this epoch
-            valid_loss, ef_emd, in_parts, gen_parts, pred_emd = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler, gen_emd_corr=True)
+            valid_loss, ef_emd, in_parts, gen_parts, pred_emd = test(model,
+                                                                     valid_loader,
+                                                                     valid_samples,
+                                                                     args.batch_size,
+                                                                     loss_ftn_obj,
+                                                                     scaler=scaler,
+                                                                     gen_emd_corr=True,
+                                                                     emd_adv_train=False,
+                                                                     emd_optimizer=None,
+                                                                     emd_adv_patience=4,
+                                                                     fig_save_path=None,
+                                                                     emd_model_path=None)
             gae_valid_true_emd.append(ef_emd)
             sub_dir = "valid_gae_emd_corr"
             epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch)
         else:   # default
-            valid_loss = test(model, valid_loader, valid_samples, args.batch_size, loss_ftn_obj, scaler=scaler)
+            valid_loss = test(model,
+                              valid_loader,
+                              valid_samples,
+                              args.batch_size,
+                              loss_ftn_obj,
+                              scaler=scaler,
+                              emd_adv_train=True,
+                              emd_optimizer=emd_optimizer,
+                              emd_adv_patience=4,
+                              fig_save_path='emd_train_curve_gae_valid',
+                              emd_model_path=emdmodpath)
             if 'emd_loss' in loss_ftn_obj.name:
                 valid_loss, ef_emd = valid_loss
                 gae_valid_true_emd.append(ef_emd)

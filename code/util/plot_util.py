@@ -137,7 +137,7 @@ def loss_curves(epochs, early_stop_epoch, train_loss, valid_loss, save_path, tra
     plt.savefig(osp.join(save_path, 'loss_curves.png'))
     plt.close()
 
-def adv_loss_curves(epochs, train_loss, valid_loss, save_path):
+def adv_loss_curves(epochs, train_loss, valid_loss, save_path, save_name='emd_adv_loss_curves'):
     '''
         Graph our training and validation losses.
     '''
@@ -154,8 +154,8 @@ def adv_loss_curves(epochs, train_loss, valid_loss, save_path):
     plt.xlabel("Epochs")
     plt.ylabel("MSE Loss")
     plt.legend(['Train', 'Validation'])
-    plt.savefig(osp.join(save_path, 'emd_adv_loss_curves.pdf'))
-    plt.savefig(osp.join(save_path, 'emd_adv_loss_curves.png'))
+    plt.savefig(osp.join(save_path, save_name + '.pdf'))
+    plt.savefig(osp.join(save_path, save_name + '.png'))
     plt.close()
 
 def epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch):
@@ -332,3 +332,23 @@ def plot_emd_corr(model, loader, emd_loss_ftn, save_dir, save_name, scaler, devi
             emd_val = ef.emd.emd(j1, j2)
             true_emd.append(emd_val)
     make_plots(true_emd, pred_emd)
+
+def plot_emd_training_one_batch(epochs, losses, emd_diffs, save_name, save_path):
+    plt.figure(figsize=(10,9.5))
+    fig, ax1 = plt.subplots()
+
+    color = 'tab:blue'
+    ax1.set_xlabel('Epochs')
+    ax1.set_ylabel('MSE Loss (Btwn EMD)', color=color)
+    ax1.plot(epochs, losses, color=color)
+    ax1.tick_params(axis='y', labelcolor=color)
+
+    ax2 = ax1.twinx()
+    color = 'tab:red'
+    ax2.set_ylabel('EMD Difference |True - Pred|', color=color)
+    ax2.plot(epochs, emd_diffs, color=color)
+    ax2.tick_params(axis='y', labelcolor=color)
+    fig.tight_layout()
+    plt.title(f"EMD Training on {save_name}")
+    plt.savefig(osp.join(save_path, save_name + '.pdf'))
+    plt.close()

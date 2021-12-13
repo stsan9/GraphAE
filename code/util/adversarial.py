@@ -7,8 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 from itertools import chain
 from util.loss_util import preprocess_emdnn_input
+from util.plot_util import plot_emd_training_one_batch
 
-def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, device=torch.device('cuda:0')):
+def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, max_iters=1, patience=3, batch_num=0, save_path='.', device=torch.device('cuda:0')):
     """
     Train emd model on (input, gae_reco) for one epoch. Can use for validation if emd_optimizer is None.
 
@@ -17,6 +18,10 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, device=to
     :param emd_optimizer: torch optimizer for emd_model; None for validation
     :param batch: the batch we want to optimize on
     :param scaler: StandardScaler for reversing data to unstandardized form
+    :param max_iters: how many iterations to loop
+    :param patience: train emd patience
+    :param batch_num: what batch is being trained on
+    :param save_path: path to save any figures
     :param device: device model is on
     :return: average loss of EMD-NN
     """
@@ -31,8 +36,6 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, device=to
         return emd
 
     sum_loss = 0
-    sum_emd_pred = 0
-    sum_true_emd = 0
 
     b = batch
     b = b.clone()
@@ -62,30 +65,44 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, device=to
     emd_nn_inputs = preprocess_emdnn_input(jet_in, jet_reco, b.batch)
     emd_targets = torch.tensor(emds).to(device)
 
-    # emd network
-    if emd_optimizer == None:
+    # emd inference
+    if emd_optimizer == None:   # validate
         with torch.no_grad():
+            emd_preds = emd_model(emd_nn_inputs)[0]
+    else:   # train
+        losses = []
+        emd_diffs = []
+        stale_epochs = 0
+        best_loss = 9999999
+        for _ in range(max_iters):
             emd_preds = emd_model(emd_nn_inputs)[0] # index 0 to toss extra output
-    else:
-        emd_preds = emd_model(emd_nn_inputs)[0] # index 0 to toss extra output
-    emd_preds = emd_preds.squeeze()
+            emd_preds = emd_preds.squeeze()
 
-    loss = F.mse_loss(emd_preds, emd_targets, reduction='mean')
-    if emd_optimizer != None:
-        emd_optimizer.zero_grad()
-        loss.backward()
-        emd_optimizer.step()
+            loss = F.mse_loss(emd_preds, emd_targets, reduction='mean')
+            losses.append(loss.item())
+            emd_diffs.append(torch.mean(torch.abs(emd_targets - emd_preds)).item())
+            if loss <= best_loss:
+                stale_epochs = 0
+                if emd_optimizer != None:
+                    emd_optimizer.zero_grad()
+                    loss.backward()
+                    emd_optimizer.step()
+            else:
+                stale_epochs += 1
+                if stale_epochs == patience:
+                    break
+            if (emd_preds - emd_targets) / emd_targets <= 0.05:  # another early stop condition
+                break
+        if batch_num < 10:
+            plot_emd_training_one_batch(list(len(losses)), losses, emd_diffs, save_name=f'batch_{batch_num}', save_path=save_path)
+        
 
     loss = loss.item()
     sum_loss += loss
-    sum_emd_pred += emd_preds.mean().detach().cpu().numpy()
-    sum_true_emd += emd_targets.mean().detach().cpu().numpy()
     if emd_optimizer == None:
         print('EMD-NN valid loss = %.7f' % loss)
     else:
         print('EMD-NN train loss = %.7f' % loss)
 
     # return average loss of emd network during training
-    avg_emd_pred = sum_emd_pred
-    avg_true_emd = sum_true_emd
-    return sum_loss, avg_emd_pred, avg_true_emd
+    return sum_loss, emd_preds, emd_targets
