@@ -74,7 +74,8 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, max_iters
         emd_diffs = []
         stale_epochs = 0
         best_loss = 9999999
-        for _ in range(max_iters):
+        t = tqdm(range(max_iters))
+        for _ in t:
             emd_preds = emd_model(emd_nn_inputs)[0] # index 0 to toss extra output
             emd_preds = emd_preds.squeeze()
 
@@ -93,6 +94,9 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, max_iters
                     break
             if ((emd_preds - emd_targets) / emd_targets).mean() <= 0.05:  # another early stop condition
                 break
+            t.set_description('EMD-NN train loss = %.7f' % loss)
+            t.refresh()
+
         if batch_num < 10:
             plot_emd_training_one_batch(range(len(losses)), losses, emd_diffs, save_name=f'batch_{batch_num}', save_path=save_path)
         
@@ -101,8 +105,6 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, max_iters
     sum_loss += loss
     if emd_optimizer == None:
         print('EMD-NN valid loss = %.7f' % loss)
-    else:
-        print('EMD-NN train loss = %.7f' % loss)
 
     # return average loss of emd network during training
     return sum_loss, emd_preds, emd_targets
