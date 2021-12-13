@@ -94,7 +94,7 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, max_iters
             if ((emd_preds - emd_targets) / emd_targets).mean() <= 0.05:  # another early stop condition
                 break
         if batch_num < 10:
-            plot_emd_training_one_batch(list(len(losses)), losses, emd_diffs, save_name=f'batch_{batch_num}', save_path=save_path)
+            plot_emd_training_one_batch(range(len(losses)), losses, emd_diffs, save_name=f'batch_{batch_num}', save_path=save_path)
         
 
     loss = loss.item()
