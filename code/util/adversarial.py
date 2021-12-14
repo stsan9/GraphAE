@@ -74,7 +74,7 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, max_iters
         emd_diffs = []
         stale_epochs = 0
         best_loss = 9999999
-        t = tqdm(range(max_iters))
+        t = tqdm(range(max_iters), leave=False)
         for _ in t:
             emd_preds = emd_model(emd_nn_inputs)[0] # index 0 to toss extra output
             emd_preds = emd_preds.squeeze()
