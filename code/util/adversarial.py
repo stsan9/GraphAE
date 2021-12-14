@@ -32,7 +32,7 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, max_iters
         :param jet1: numpy array (n x [pt eta phi])
         :param jet2: numpy array (n x [pt eta phi])
         """
-        emd = ef.emd.emd(jet1, jet2)
+        emd = ef.emd.emd(jet1, jet2, n_iter_max=5000000)
         return emd
 
     sum_loss = 0
