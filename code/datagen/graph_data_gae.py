@@ -116,6 +116,7 @@ class GraphDataset(Dataset):
             if self.n_particles != -1:   # 0 pad / fix length
                 if self.n_particles < n_particles:
                     particles = particles[:self.n_particles]
+                    n_particles = self.n_particles
                 else:
                     z = np.zeros((self.n_particles,3))
                     z[:particles.shape[0],:] = particles
