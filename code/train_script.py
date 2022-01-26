@@ -285,11 +285,11 @@ def main(args):
                                                                      loss_ftn_obj,
                                                                      scaler=scaler,
                                                                      gen_emd_corr=True,
-                                                                     emd_adv_train=False,
-                                                                     emd_optimizer=None,
+                                                                     emd_adv_train=True,
+                                                                     emd_optimizer=emd_optimizer,
                                                                      emd_adv_patience=4,
-                                                                     fig_save_path=None,
-                                                                     emd_model_path=None)
+                                                                     fig_save_path='emd_train_curve_gae_valid',
+                                                                     emd_model_path=emdmodpath)
             gae_valid_true_emd.append(ef_emd)
             sub_dir = "valid_gae_emd_corr"
             epoch_emd_corr(in_parts, gen_parts, pred_emd, save_dir, sub_dir, epoch)

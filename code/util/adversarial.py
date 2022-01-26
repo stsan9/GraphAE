@@ -80,6 +80,7 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, max_iters
             emd_preds = emd_preds.squeeze()
 
             loss = F.mse_loss(emd_preds, emd_targets, reduction='mean')
+            losses.append(loss.item())
             emd_diffs.append(torch.mean(torch.abs(emd_targets - emd_preds)).item())
             if loss <= best_loss:   # update weights
                 stale_epochs = 0
@@ -89,14 +90,14 @@ def loop_emd_model(gae_model, emd_model, emd_optimizer, batch, scaler, max_iters
                     loss.backward()
                     emd_optimizer.step()
 
-                losses.append(loss.item())
-                if ((emd_preds - emd_targets) / emd_targets).mean() <= 0.05:  # another early stop condition
-                    break
+            elif ((emd_preds - emd_targets) / emd_targets).mean() <= 0.05:  # another early stop condition
+                break
+
             else:   # exceeds patience
-                losses.append(loss.item())
                 stale_epochs += 1
                 if stale_epochs == patience:
                     break
+
             t.set_description('EMD-NN train loss = %.7f' % loss)
             t.refresh()
 
