@@ -261,7 +261,7 @@ def main(args):
         #                 break
 
         # train GAE
-        loss = train(model,
+        train_loss = train(model,
                      optimizer,
                      train_loader,
                      train_samples,
@@ -273,7 +273,7 @@ def main(args):
                      fig_save_path=osp.join(save_dir,'emd_train_curves'),
                      emd_model_path=emdmodpath)
         if 'emd_loss' in loss_ftn_obj.name:     # for emd_loss unpack emd target from emd pred
-            train_loss, ef_emd = loss
+            train_loss, ef_emd = train_loss
             gae_train_true_emd.append(ef_emd)
 
         # validate GAE
