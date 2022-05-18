@@ -79,13 +79,13 @@ for epoch in tqdm(range(max_epochs)):
     emdcnn.train()
     for i in t:
         batch_indices = rand_indices[i : i + batch_size]
-        batch = imgs[batch_indices]
+        batch = train_imgs[batch_indices]
         batch_cpu_copy = batch.clone()
 
         inner_t = tqdm(range(i + batch_size, len(train_imgs), batch_size), leave=False, desc='Inner-Loop...')
         for j in inner_t:
             batch_indices_2 = rand_indices[j : j + batch_size]
-            batch_2 = imgs[batch_indices_2]
+            batch_2 = train_imgs[batch_indices_2]
             if len(batch_2) != len(batch):
                 continue
 
