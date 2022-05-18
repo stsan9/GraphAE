@@ -3,6 +3,9 @@ import numpy as np
 import energyflow as ef
 import cv2
 
+ONE_HUNDRED_GEV = 100.0
+R = 0.4
+
 # CV2 helpers
 img_2d_coord_mat = torch.tensor(np.meshgrid(np.arange(28), np.arange(28))).T.reshape(-1,2)
 
