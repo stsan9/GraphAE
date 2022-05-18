@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from qg_data_to_img import get_qg_imgs
+from emd_calc import calc_emd_on_batch_cv2
 
 device = torch.device('cuda:0')
 
