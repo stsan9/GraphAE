@@ -3,9 +3,12 @@ import energyflow as ef
 import torch
 import jetnet
 import cv2
+import torch.nn as nn
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from qg_data_to_img import get_qg_imgs
+from emd_calc import calc_emd_on_batch_cv2
 
 device = torch.device('cuda:0')
 
@@ -77,13 +80,13 @@ for epoch in tqdm(range(max_epochs)):
     emdcnn.train()
     for i in t:
         batch_indices = rand_indices[i : i + batch_size]
-        batch = imgs[batch_indices]
+        batch = train_imgs[batch_indices]
         batch_cpu_copy = batch.clone()
 
         inner_t = tqdm(range(i + batch_size, len(train_imgs), batch_size), leave=False, desc='Inner-Loop...')
         for j in inner_t:
             batch_indices_2 = rand_indices[j : j + batch_size]
-            batch_2 = imgs[batch_indices_2]
+            batch_2 = train_imgs[batch_indices_2]
             if len(batch_2) != len(batch):
                 continue
 
