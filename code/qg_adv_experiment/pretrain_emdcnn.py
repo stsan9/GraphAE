@@ -3,7 +3,9 @@ import energyflow as ef
 import torch
 import jetnet
 import cv2
+import torch.nn as nn
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from qg_data_to_img import get_qg_imgs
 
